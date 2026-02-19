@@ -112,11 +112,11 @@ export async function POST(request: Request) {
     }
 
     const baseUrl = resolveAppUrl(request);
-    const callbackUrl = `${baseUrl.replace(/\/$/, "")}/api/webhooks/paystack`;
     const returnPath = getReturnPathForRole(user.role);
     const returnUrl = `${baseUrl.replace(/\/$/, "")}${returnPath}?payment=success`;
 
     // Initialize Paystack payment
+    // callback_url = where Paystack redirects the USER after payment (your site). Webhook is configured separately in Paystack dashboard.
     // Ensure we have a valid email for Paystack
     let userEmail = user.fullName || user.username || user.phoneNumber || "customer";
     // If it doesn't look like an email, make it one
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       orderNumber: ref,
       amount: chargeAmount,
       email: userEmail,
-      callbackUrl
+      returnUrl
     });
 
     const paymentResult = await paystackService.initializePayment({
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       orderNumber: ref,
       amount: chargeAmount,
       email: userEmail,
-      callbackUrl,
+      callbackUrl: returnUrl,
       secretKey
     });
 
@@ -152,7 +152,6 @@ export async function POST(request: Request) {
       rewardToUse: parsed.data.rewardToUse ?? 0,
       useWallet: parsed.data.useWallet ?? false,
       orderId: orderId ?? null,
-      callbackUrl,
       returnUrl,
       createdAt: new Date().toISOString()
     }));

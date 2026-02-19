@@ -41,7 +41,6 @@ export async function POST(request: Request) {
     }
 
     const baseUrl = resolveAppUrl(request);
-    const callbackUrl = `${baseUrl.replace(/\/$/, "")}/api/webhooks/paystack`;
     const returnUrl = `${baseUrl.replace(/\/$/, "")}/agent?payment=success`;
 
     const { paystack } = await getPaymentSettings();
@@ -54,13 +53,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Initialize Paystack payment
+    // Initialize Paystack payment (callback_url = where to redirect user after payment)
     const paymentResult = await paystackService.initializePayment({
       orderId: userId, // Using userId as orderId for agent upgrade
       orderNumber: ref,
       amount,
       email: user.fullName || user.username || `${user.phoneNumber}@keldatagh.com`,
-      callbackUrl,
+      callbackUrl: returnUrl,
       secretKey
     });
 
@@ -79,7 +78,6 @@ export async function POST(request: Request) {
         metadata: {
           type: "agent_upgrade",
           clientRef: ref,
-          callbackUrl,
           returnUrl,
           createdAt: new Date().toISOString()
         },
@@ -93,7 +91,6 @@ export async function POST(request: Request) {
         metadata: {
           type: "agent_upgrade",
           clientRef: ref,
-          callbackUrl,
           returnUrl,
           createdAt: new Date().toISOString()
         },

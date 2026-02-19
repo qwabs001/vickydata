@@ -19,9 +19,21 @@ function normalizeUrl(value: string): string {
 }
 
 export function resolveAppUrl(request: Request, fallback: string = DEFAULT_APP_URL): string {
+  const isVercel = Boolean(process.env.VERCEL_URL);
+
   const envUrl = process.env.NEXT_PUBLIC_APP_URL;
   if (envUrl && envUrl.trim()) {
-    return normalizeUrl(envUrl.trim());
+    const url = normalizeUrl(envUrl.trim());
+    if (!isLocalhostUrl(url)) return url;
+    if (isVercel) return fallback;
+    return url;
+  }
+
+  if (isVercel) {
+    const vercelUrl = process.env.VERCEL_URL?.trim();
+    if (vercelUrl) {
+      return `https://${vercelUrl.replace(/^https?:\/\//, "").split("/")[0]}`;
+    }
   }
 
   const originHeader = request.headers.get("origin") ?? "";
@@ -30,9 +42,8 @@ export function resolveAppUrl(request: Request, fallback: string = DEFAULT_APP_U
   const inferred = originHeader || (forwardedHost ? `${forwardedProto}://${forwardedHost}` : "");
   const normalized = inferred ? normalizeUrl(inferred) : "";
 
-  if (normalized && isLocalhostUrl(normalized)) {
-    return normalized;
-  }
+  if (normalized && !isLocalhostUrl(normalized)) return normalized;
+  if (normalized && isLocalhostUrl(normalized) && isVercel) return fallback;
 
   return fallback;
 }
