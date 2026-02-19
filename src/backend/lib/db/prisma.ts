@@ -19,6 +19,12 @@ function getDatabaseUrl(): string {
   // Use connection_limit=1 per function instance to minimize pool exhaustion
   const withLimit = withSsl.includes("connection_limit=") ? withSsl : append(withSsl, "connection_limit=1");
 
+  // For pgbouncer transaction mode (port 6543), Prisma requires prepared_statements=false
+  const isPgbouncerMode = withLimit.includes("pgbouncer=true") || withLimit.includes(":6543");
+  const withPreparedStatements = isPgbouncerMode && !withLimit.includes("prepared_statements=")
+    ? append(withLimit, "prepared_statements=false")
+    : withLimit;
+
   // Warn if using direct connection or session mode (5432) on Vercel — use transaction mode (6543) instead
   if (process.env.VERCEL === "1") {
     if (url.includes("db.") && url.includes(".supabase.co")) {
@@ -33,13 +39,16 @@ function getDatabaseUrl(): string {
     }
   }
 
-  return withLimit;
+  return withPreparedStatements;
 }
+
+const dbUrl = getDatabaseUrl();
+const isPgbouncer = dbUrl.includes("pgbouncer=true") || dbUrl.includes(":6543");
 
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    datasources: { db: { url: getDatabaseUrl() } },
+    datasources: { db: { url: dbUrl } },
     log: process.env.NODE_ENV === "development" ? ["query", "error"] : ["error"]
   });
 
