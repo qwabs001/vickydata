@@ -241,7 +241,20 @@ const Theme5: React.FC = () => {
     password: string;
     confirmPassword: string;
   }) => {
-    if (!isValidGhanaPhone(payload.phoneNumber)) {
+    // Ensure phone number has +233 prefix
+    let phoneNumber = payload.phoneNumber.trim();
+    if (!phoneNumber.startsWith("+233")) {
+      // Remove any existing +233 or 0 prefix and add +233
+      const digits = phoneNumber.replace(/^\+233|^0/, "").replace(/\D/g, "");
+      if (digits.length >= 9) {
+        phoneNumber = `+233${digits}`;
+      } else {
+        setSignupError("Enter a valid Ghana phone number.");
+        return;
+      }
+    }
+
+    if (!isValidGhanaPhone(phoneNumber)) {
       setSignupError("Enter a valid Ghana phone number.");
       return;
     }
@@ -249,16 +262,32 @@ const Theme5: React.FC = () => {
     setIsSignupSubmitting(true);
     setSignupError(null);
     try {
-      // Get referral code from URL if present
-      const referralCode = searchParams?.get("ref") || null;
+      // Get referral code from URL if present - use undefined instead of null for Zod
+      const refParam = searchParams?.get("ref");
+      const referralCode = refParam && refParam.trim().length >= 3 ? refParam.trim() : undefined;
+      
+      const signupPayload: {
+        username: string;
+        phoneNumber: string;
+        password: string;
+        confirmPassword: string;
+        referralCode?: string;
+      } = {
+        username: payload.username,
+        phoneNumber,
+        password: payload.password,
+        confirmPassword: payload.confirmPassword
+      };
+      
+      // Only include referralCode if it exists
+      if (referralCode) {
+        signupPayload.referralCode = referralCode;
+      }
       
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...payload,
-          referralCode
-        }),
+        body: JSON.stringify(signupPayload),
       });
 
       if (!response.ok) {
