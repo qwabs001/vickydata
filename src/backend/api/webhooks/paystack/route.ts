@@ -102,8 +102,7 @@ export async function POST(request: Request) {
                 amount: paymentIntent.amount,
                 balanceBefore: before,
                 balanceAfter: after,
-                description: `Added via Paystack (${paymentIntent.reference})`,
-                referenceNumber: paymentIntent.reference
+                description: `Added via Paystack (${paymentIntent.reference})`
               }
             });
           });
