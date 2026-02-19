@@ -233,29 +233,8 @@ export async function createResellerOrder(input: CreateOrderInput): Promise<{
         throw error;
       }
 
-      const order = await tx.order.create({
-        data: {
-          orderNumber: generateOrderNumber(),
-          userId: input.agent.id,
-          networkId: plan.networkId,
-          dataPlanId: plan.id,
-          status: "PENDING",
-          amount: totalAmount,
-          currency: plan.currency,
-          paymentMethod: "WALLET",
-          paymentStatus: "COMPLETED",
-          recipientNumber: phone,
-          apiRequestPayload: {
-            source: "reseller_api",
-            qty: input.qty,
-            unitPrice,
-            clientOrderId,
-            idempotencyKey,
-            credentialId: input.credentialId
-          }
-        }
-      });
-
+      // Deduct wallet as soon as possible (before creating order)
+      const orderNumber = generateOrderNumber();
       const balanceAfter = roundMoney(currentBalance - totalAmount);
 
       await tx.walletBalance.upsert({
@@ -279,7 +258,30 @@ export async function createResellerOrder(input: CreateOrderInput): Promise<{
           amount: totalAmount,
           balanceBefore: currentBalance,
           balanceAfter,
-          description: `Reseller API order ${order.orderNumber}`
+          description: `Reseller API order ${orderNumber}`
+        }
+      });
+
+      const order = await tx.order.create({
+        data: {
+          orderNumber,
+          userId: input.agent.id,
+          networkId: plan.networkId,
+          dataPlanId: plan.id,
+          status: "PENDING",
+          amount: totalAmount,
+          currency: plan.currency,
+          paymentMethod: "WALLET",
+          paymentStatus: "COMPLETED",
+          recipientNumber: phone,
+          apiRequestPayload: {
+            source: "reseller_api",
+            qty: input.qty,
+            unitPrice,
+            clientOrderId,
+            idempotencyKey,
+            credentialId: input.credentialId
+          }
         }
       });
 

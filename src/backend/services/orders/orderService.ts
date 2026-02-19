@@ -69,6 +69,7 @@ export const orderService = {
         });
       }
 
+      // Deduct wallet as soon as possible when paying with wallet (before creating order)
       if (useWallet) {
         const wallet = await tx.walletBalance.findUnique({
           where: { userId: payload.userId }
