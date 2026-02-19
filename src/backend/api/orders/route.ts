@@ -25,6 +25,17 @@ export async function GET(request: Request) {
       }
     }
 
+    // When fetching by userId, allow only that user or an admin
+    if (scope !== "all" && userId) {
+      const requesterId = request.headers.get("x-user-id");
+      if (requesterId !== userId) {
+        const auth = await requireAdmin(request);
+        if (!auth.ok) {
+          return NextResponse.json({ orders: [] });
+        }
+      }
+    }
+
     // Run sync in background so response isn't delayed (sync can hit external provider API)
     if (scope !== "all" && userId) {
       void import("@/backend/services/dataProvider/dataProviderService").then(({ dataProviderService }) =>
@@ -35,8 +46,9 @@ export async function GET(request: Request) {
     }
 
     const whereClause = scope === "all" ? undefined : { userId: userId as string };
-    const requestedLimit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(200, Math.floor(limitParam)) : 0;
-    const defaultLimit = scope === "all" ? 200 : 100;
+    const maxLimit = scope === "all" ? 2000 : 200;
+    const requestedLimit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(maxLimit, Math.floor(limitParam)) : 0;
+    const defaultLimit = scope === "all" ? 500 : 100;
     const take = requestedLimit > 0 ? requestedLimit : defaultLimit;
     const page = Math.max(1, Math.floor(pageParam) || 1);
     const skip = (page - 1) * take;

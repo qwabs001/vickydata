@@ -33,6 +33,9 @@ export default function Page() {
   const [dateRange, setDateRange] = useState(dateRanges[1]);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [userOrdersModal, setUserOrdersModal] = useState<{ userId: string; username: string } | null>(null);
+  const [userOrders, setUserOrders] = useState<any[]>([]);
+  const [userOrdersLoading, setUserOrdersLoading] = useState(false);
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -40,7 +43,7 @@ export default function Page() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch("/api/orders?scope=all", {
+        const response = await fetch("/api/orders?scope=all&limit=500", {
           headers: { "x-user-id": user.id }
         });
         const data = await response.json().catch(() => null);
@@ -119,6 +122,23 @@ export default function Page() {
         .then((data) => setOrders(data?.orders ?? []))
         .catch(() => setOrders([]))
         .finally(() => setLoading(false));
+    }
+  };
+
+  const openUserOrders = async (userId: string, username: string) => {
+    setUserOrdersModal({ userId, username });
+    setUserOrders([]);
+    setUserOrdersLoading(true);
+    try {
+      const res = await fetch(`/api/orders?userId=${encodeURIComponent(userId)}&limit=200`, {
+        headers: { "x-user-id": user!.id }
+      });
+      const data = await res.json().catch(() => ({}));
+      setUserOrders(Array.isArray(data?.orders) ? data.orders : []);
+    } catch {
+      setUserOrders([]);
+    } finally {
+      setUserOrdersLoading(false);
     }
   };
 
@@ -267,7 +287,18 @@ export default function Page() {
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{order.orderNumber}</p>
                       <p className="text-xs text-slate-500">
-                        {order.user?.username ?? "Customer"} • {order.user?.phoneNumber ?? "—"}
+                        {order.user ? (
+                          <button
+                            type="button"
+                            onClick={() => openUserOrders(order.user.id, order.user.username ?? "Customer")}
+                            className="font-semibold text-[#2563eb] hover:underline"
+                          >
+                            {order.user.username ?? "Customer"}
+                          </button>
+                        ) : (
+                          "Customer"
+                        )}{" "}
+                        • {order.user?.phoneNumber ?? "—"}
                       </p>
                     </div>
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[statusLabel] ?? "bg-slate-100 text-slate-600"}`}>
@@ -390,7 +421,17 @@ export default function Page() {
                     <tr key={order.id} className="border-t border-slate-100">
                       <td className="px-4 py-4 font-semibold text-slate-700">{order.orderNumber}</td>
                       <td className="px-4 py-4 text-slate-600">
-                        {order.user?.username ?? "Customer"}
+                        {order.user ? (
+                          <button
+                            type="button"
+                            onClick={() => openUserOrders(order.user.id, order.user.username ?? "Customer")}
+                            className="text-left font-semibold text-[#2563eb] hover:underline"
+                          >
+                            {order.user.username ?? "Customer"}
+                          </button>
+                        ) : (
+                          "Customer"
+                        )}
                         <div className="text-xs text-slate-400">{order.user?.phoneNumber}</div>
                       </td>
                       <td className="px-4 py-4 text-slate-600">{order.network?.displayName ?? order.network?.name}</td>
@@ -479,6 +520,47 @@ export default function Page() {
           </table>
         </div>
       </section>
+
+      {userOrdersModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setUserOrdersModal(null)}>
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <h2 className="text-lg font-bold text-slate-900">Orders by {userOrdersModal.username}</h2>
+              <button type="button" onClick={() => setUserOrdersModal(null)} className="rounded-full p-1 text-slate-500 hover:bg-slate-100">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto p-4">
+              {userOrdersLoading ? (
+                <p className="py-8 text-center text-sm text-slate-500">Loading orders…</p>
+              ) : userOrders.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-500">No orders found.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {userOrders.map((order) => {
+                    const statusLabel = statusMap[order.status] ?? order.status;
+                    const planLabel = order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "Plan";
+                    return (
+                      <li key={order.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3 text-sm">
+                        <div>
+                          <span className="font-semibold text-slate-800">{order.orderNumber}</span>
+                          <span className="ml-2 text-slate-500">{order.network?.displayName ?? order.network?.name}</span>
+                          <span className="mx-2 text-slate-300">·</span>
+                          <span className="text-slate-600">{planLabel}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-slate-900">{order.currency} {typeof order.amount === "number" ? order.amount.toFixed(2) : order.amount}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusStyles[statusLabel] ?? "bg-slate-100 text-slate-600"}`}>{statusLabel}</span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
