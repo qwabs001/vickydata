@@ -89,12 +89,30 @@ export default function CustomerDashboardPage() {
     });
   };
 
-  // Refresh data when returning from payment callback
+  // When returning from Paystack: verify payment and credit wallet, then refresh
   useEffect(() => {
     if (!user?.id || typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
     const urlPayment = params.get("payment");
+    const reference = params.get("reference") || params.get("trxref");
+
+    if (urlPayment === "success" && reference) {
+      fetch(
+        `/api/payments/paystack/verify-return?reference=${encodeURIComponent(reference)}&userId=${encodeURIComponent(user.id)}`
+      )
+        .then((res) => res.json().catch(() => null))
+        .then(() => {
+          refreshOrders();
+          refreshWallet();
+        })
+        .catch(() => {
+          refreshOrders();
+          refreshWallet();
+        });
+      return;
+    }
+
     if (urlPayment === "success") {
       refreshOrders();
       refreshWallet();

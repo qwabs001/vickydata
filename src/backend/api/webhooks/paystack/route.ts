@@ -46,16 +46,18 @@ export async function POST(request: Request) {
 
     if (paymentIntent) {
       const metadata = paymentIntent.metadata as { type?: string; orderId?: string } | null;
-      
-      // Update payment intent status
-      await prisma.paymentIntent.update({
-        where: { id: paymentIntent.id },
-        data: {
-          status: "CONFIRMED",
-          verifiedAt: new Date(),
-          rawVerify: JSON.parse(JSON.stringify(event.data || {}))
-        }
-      });
+      const wasAlreadyConfirmed = paymentIntent.status === "CONFIRMED";
+
+      if (!wasAlreadyConfirmed) {
+        await prisma.paymentIntent.update({
+          where: { id: paymentIntent.id },
+          data: {
+            status: "CONFIRMED",
+            verifiedAt: new Date(),
+            rawVerify: JSON.parse(JSON.stringify(event.data || {}))
+          }
+        });
+      }
 
       // Handle agent upgrade
       if (metadata?.type === "agent_upgrade") {
@@ -70,8 +72,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true });
       }
 
-      // Handle wallet top-up
-      if (paymentIntent.type === "WALLET_TOPUP" && metadata?.type !== "agent_upgrade") {
+      // Handle wallet top-up (only if not already processed by verify-return)
+      if (
+        !wasAlreadyConfirmed &&
+        paymentIntent.type === "WALLET_TOPUP" &&
+        metadata?.type !== "agent_upgrade"
+      ) {
         const user = paymentIntent.user;
         if (user) {
           await prisma.$transaction(async (tx) => {
@@ -111,8 +117,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true });
       }
 
-      // Handle order payment via paymentIntent metadata
-      if (metadata?.orderId) {
+      // Handle order payment via paymentIntent metadata (only if not already processed)
+      if (!wasAlreadyConfirmed && metadata?.orderId) {
         const order = await prisma.order.findUnique({
           where: { id: metadata.orderId }
         });

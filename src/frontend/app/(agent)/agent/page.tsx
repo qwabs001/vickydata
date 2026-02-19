@@ -63,6 +63,22 @@ export default function AgentDashboardPage() {
     if (!user?.id || typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference") || params.get("trxref");
+    if (params.get("payment") === "success" && reference) {
+      fetch(
+        `/api/payments/paystack/verify-return?reference=${encodeURIComponent(reference)}&userId=${encodeURIComponent(user.id)}`
+      )
+        .then((res) => res.json().catch(() => null))
+        .then(() => {
+          refreshOrders();
+          refreshWallet();
+        })
+        .catch(() => {
+          refreshOrders();
+          refreshWallet();
+        });
+      return;
+    }
     if (params.get("payment") === "success") {
       refreshOrders();
       refreshWallet();
