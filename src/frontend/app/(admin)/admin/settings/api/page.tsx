@@ -45,7 +45,17 @@ export default function Page() {
       const res = await fetch("/api/admin/settings/api-config", {
         headers: { "x-user-id": user.id }
       });
-      const data = await res.json().catch(() => []);
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        setError(typeof data?.error === "string" ? data.error : "Database temporarily unavailable. Please try again in a moment.");
+        setConfigs([]);
+        return;
+      }
+      if (!res.ok) {
+        setError(typeof data?.error === "string" ? data.error : "Unable to load API configs.");
+        setConfigs([]);
+        return;
+      }
       setConfigs(Array.isArray(data) ? data : []);
     } catch {
       setError("Unable to load API configs.");
@@ -230,8 +240,16 @@ export default function Page() {
         </div>
       ) : null}
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-          {error}
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 flex flex-wrap items-center justify-between gap-2">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => loadConfigs()}
+            disabled={loading}
+            className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
+          >
+            {loading ? "Loading..." : "Retry"}
+          </button>
         </div>
       ) : null}
 

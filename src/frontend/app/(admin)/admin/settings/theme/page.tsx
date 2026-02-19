@@ -111,7 +111,16 @@ export default function Page() {
           saveThemeSettings({ logoUrl: data.logoUrl });
         }
         if (data.footer) setFooter((prev) => ({ ...prev, ...data.footer }));
-        if (data.contact) setContact((prev) => ({ ...prev, ...data.contact }));
+        if (data.contact) {
+          // Deep merge to preserve all fields including customLabel and customUrl
+          setContact((prev) => ({
+            ...prev,
+            ...data.contact,
+            // Explicitly preserve custom fields if they exist in the loaded data
+            customLabel: data.contact.customLabel ?? prev.customLabel ?? "",
+            customUrl: data.contact.customUrl ?? prev.customUrl ?? ""
+          }));
+        }
       } catch {
         // ignore
       }
@@ -261,19 +270,41 @@ export default function Page() {
     setContactSaving(true);
     setContactNotice(null);
     try {
+      // Send all contact fields, trimming whitespace but preserving empty strings
+      // This ensures customLabel and customUrl are saved even if they're empty (to clear them)
+      const contactToSave: ContactSettings = {
+        whatsapp: contact.whatsapp.trim(),
+        telegram: contact.telegram.trim(),
+        messenger: contact.messenger?.trim() || "",
+        email: contact.email.trim(),
+        phone: contact.phone.trim(),
+        customLabel: contact.customLabel.trim(),
+        customUrl: contact.customUrl.trim(),
+        showWidget: contact.showWidget
+      };
+
       const res = await fetch("/api/admin/brand/theme", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-user-id": user.id },
-        body: JSON.stringify({ contact })
+        body: JSON.stringify({ contact: contactToSave })
       });
-      if (!res.ok) throw new Error("Failed to save contact settings.");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData?.error || "Failed to save contact settings.");
+      }
+      const savedData = await res.json().catch(() => null);
+      // Update local state with saved data to ensure consistency
+      if (savedData?.contact) {
+        setContact((prev) => ({ ...prev, ...savedData.contact }));
+      }
       setContactNotice("Contact settings saved.");
       // Trigger theme refresh in all tabs/windows
       localStorage.setItem("theme:refresh", Date.now().toString());
       window.dispatchEvent(new Event("theme:refresh"));
       window.setTimeout(() => setContactNotice(null), 2500);
-    } catch {
-      setContactNotice("Unable to save contact settings.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to save contact settings.";
+      setContactNotice(message);
     } finally {
       setContactSaving(false);
     }
