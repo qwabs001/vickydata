@@ -57,7 +57,7 @@ export async function POST(request: Request) {
               data: {
                 status: "CONFIRMED",
                 verifiedAt: new Date(),
-                rawVerify: event.data as unknown
+                rawVerify: JSON.parse(JSON.stringify(event.data || {}))
               }
             });
 
