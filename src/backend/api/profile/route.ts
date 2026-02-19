@@ -38,7 +38,15 @@ export async function GET(request: Request) {
       role: user.role
     });
   } catch (error) {
-    console.error("Profile fetch error:", error);
+    console.error("[Profile API] Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unable to load profile.";
+    // Check if it's a database connection error
+    if (errorMessage.includes("MaxClientsInSessionMode") || errorMessage.includes("connection")) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: "Unable to load profile." }, { status: 500 });
   }
 }

@@ -50,7 +50,21 @@ export async function POST(request: Request) {
       }
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    let user;
+    try {
+      user = await prisma.user.findUnique({ where: { id: userId } });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "";
+      if (errorMessage.includes("MaxClientsInSessionMode") || errorMessage.includes("connection")) {
+        console.error("[Paystack Initialize] Database connection error:", errorMessage);
+        return NextResponse.json(
+          { error: "Database temporarily unavailable. Please try again in a moment." },
+          { status: 503 }
+        );
+      }
+      throw error;
+    }
+
     if (!user || user.status !== "ACTIVE") {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
