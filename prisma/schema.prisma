@@ -1,0 +1,507 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  AGENT
+  ADMIN
+}
+
+enum AgentApiCredentialStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ResellerWebhookDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  DEAD_LETTER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  MOOLRE
+  PAYSTACK
+}
+
+enum PaymentIntentType {
+  WALLET_TOPUP
+  ORDER
+}
+
+enum PaymentIntentStatus {
+  INITIATED
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+enum TransactionType {
+  DEBIT
+  CREDIT
+  REFUND
+}
+
+enum RewardsTransactionType {
+  EARNED
+  SPENT
+  WITHDRAWN
+  EXPIRED
+  ADJUSTED
+}
+
+enum WalletTransactionType {
+  ADDED
+  SPENT
+  ADJUSTED
+}
+
+enum WithdrawalMethod {
+  MOBILE_MONEY
+  BANK_TRANSFER
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+model User {
+  id                    String                 @id @default(cuid())
+  username              String                 @unique
+  referralCode          String                 @unique @default(cuid())
+  referredById          String?
+  referredBy            User?                  @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals             User[]                 @relation("UserReferrals")
+  referralRewardedAt    DateTime?
+  phoneNumber           String                 @unique
+  password              String
+  fullName              String?
+  role                  UserRole               @default(CUSTOMER)
+  status                UserStatus             @default(ACTIVE)
+  profileImage          String?
+  country               String?                @default("Ghana")
+  preferences           Json?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  lastLoginAt           DateTime?
+
+  orders                Order[]
+  rewardsBalance        RewardsBalance?
+  rewardsTransactions   RewardsTransaction[]
+  withdrawalRequests    WithdrawalRequest[]
+  walletBalance         WalletBalance?
+  walletTransactions    WalletTransaction[]
+  paymentIntents        PaymentIntent[]
+  agentApiCredentials   AgentApiCredential[]
+  agentApiNonces        AgentApiNonce[]
+  agentApiRequestLogs   AgentApiRequestLog[]
+  externalOrders        AgentExternalOrder[]
+  webhookSubscriptions  AgentWebhookSubscription[]
+  webhookDeliveries     AgentWebhookDelivery[]
+}
+
+model Network {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  displayName String
+  logoUrl     String
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  apiConfig   Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  dataPlans   DataPlan[]
+  orders      Order[]
+}
+
+model DataPlan {
+  id          String    @id @default(cuid())
+  networkId   String
+  network     Network   @relation(fields: [networkId], references: [id])
+  name        String
+  dataAmount  String
+  dataInMB    Int
+  price       Float
+  currency    String    @default("GHS")
+  validity    String?
+  description String?
+  isActive    Boolean   @default(true)
+  isFeatured  Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  orders      Order[]
+
+  @@unique([networkId, name])
+}
+
+model Order {
+  id                 String           @id @default(cuid())
+  orderNumber        String           @unique
+  userId             String
+  user               User             @relation(fields: [userId], references: [id])
+  networkId          String
+  network            Network          @relation(fields: [networkId], references: [id])
+  dataPlanId         String
+  dataPlan           DataPlan         @relation(fields: [dataPlanId], references: [id])
+  status             OrderStatus      @default(PENDING)
+  amount             Float
+  currency           String           @default("GHS")
+  paymentMethod      String?
+  paymentStatus      PaymentStatus    @default(PENDING)
+  paymentReference   String?
+  recipientNumber    String
+  apiRequestPayload  Json?
+  apiResponsePayload Json?
+  failedReason       String?
+  processedBy        String?
+  completedAt        DateTime?
+  rewardEarned       Float?           @default(0)
+  rewardUsed         Float?           @default(0)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  transactions       Transaction[]
+  rewardsTransactions RewardsTransaction[]
+  externalOrder      AgentExternalOrder?
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([paymentStatus, createdAt])
+  @@index([paymentReference])
+}
+
+model AgentApiCredential {
+  id             String                   @id @default(cuid())
+  agentId        String
+  agent          User                     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  name           String?
+  apiKey         String                   @unique
+  apiSecretHash  String
+  apiSecretEnc   String
+  status         AgentApiCredentialStatus @default(ACTIVE)
+  ipAllowlist    Json?
+  rateLimitPerMin Int                     @default(60)
+  lastUsedAt     DateTime?
+  lastRequestAt  DateTime?
+  requestCount   Int                      @default(0)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  nonces         AgentApiNonce[]
+  requestLogs    AgentApiRequestLog[]
+  externalOrders AgentExternalOrder[]
+
+  @@index([agentId, status])
+}
+
+model AgentApiNonce {
+  id           String             @id @default(cuid())
+  agentId      String
+  agent        User               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  credentialId String
+  credential   AgentApiCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  nonce        String
+  createdAt    DateTime           @default(now())
+
+  @@unique([credentialId, nonce])
+  @@index([credentialId, createdAt])
+  @@index([agentId, createdAt])
+}
+
+model AgentApiRequestLog {
+  id           String             @id @default(cuid())
+  agentId      String
+  agent        User               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  credentialId String?
+  credential   AgentApiCredential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  requestId    String?
+  method       String
+  path         String
+  statusCode   Int
+  durationMs   Int?
+  ipAddress    String?
+  errorCode    String?
+  details      Json?
+  createdAt    DateTime           @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([credentialId, createdAt])
+  @@index([createdAt])
+}
+
+model AgentExternalOrder {
+  id             String             @id @default(cuid())
+  agentId        String
+  agent          User               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  credentialId   String?
+  credential     AgentApiCredential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  orderId        String             @unique
+  order          Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  serviceId      String
+  clientOrderId  String
+  providerRef    String?
+  lastKnownStatus String?
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  webhookDeliveries AgentWebhookDelivery[]
+
+  @@unique([agentId, clientOrderId])
+  @@index([agentId, createdAt])
+  @@index([credentialId, createdAt])
+}
+
+model AgentWebhookSubscription {
+  id             String   @id @default(cuid())
+  agentId        String
+  agent          User     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  url            String
+  secretHash     String
+  secretEnc      String
+  events         Json?
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  deliveries     AgentWebhookDelivery[]
+
+  @@index([agentId, enabled])
+}
+
+model AgentWebhookDelivery {
+  id              String                        @id @default(cuid())
+  agentId         String
+  agent           User                          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  subscriptionId  String
+  subscription    AgentWebhookSubscription      @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  externalOrderId String?
+  externalOrder   AgentExternalOrder?           @relation(fields: [externalOrderId], references: [id], onDelete: SetNull)
+  event           String
+  payload         Json
+  status          ResellerWebhookDeliveryStatus @default(PENDING)
+  attempts        Int                           @default(0)
+  lastError       String?
+  nextAttemptAt   DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+
+  @@index([agentId, createdAt])
+  @@index([status, nextAttemptAt])
+}
+
+model Transaction {
+  id               String           @id @default(cuid())
+  orderId          String
+  order            Order            @relation(fields: [orderId], references: [id])
+  userId           String
+  amount           Float
+  currency         String           @default("GHS")
+  type             TransactionType
+  paymentReference String?
+  gateway          String?
+  status           PaymentStatus
+  createdAt        DateTime         @default(now())
+}
+
+model PaymentIntent {
+  id         String              @id @default(cuid())
+  userId     String
+  user       User                @relation(fields: [userId], references: [id])
+  provider   PaymentProvider
+  type       PaymentIntentType
+  status     PaymentIntentStatus @default(INITIATED)
+  amount     Float
+  currency   String              @default("GHS")
+  reference  String              @unique
+  clientReference String?
+  metadata   Json?
+  rawInit    Json?
+  rawVerify  Json?
+  lastError  String?
+  verifiedAt DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([clientReference])
+}
+
+model ApiConfiguration {
+  id            String   @id @default(cuid())
+  networkId     String?  @unique
+  provider      String   @unique
+  name          String
+  apiKey        String
+  apiSecret     String?
+  baseUrl       String
+  endpoints     Json?
+  markupPercent Float    @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Settings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  category  String?
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model RewardsConfig {
+  id                  String   @id @default(cuid())
+  rewardPercentage    Float    @default(1.0)
+  isActive            Boolean  @default(true)
+  minPurchaseAmount   Float    @default(0)
+  maxRewardPerOrder   Float?
+  minWithdrawalAmount Float    @default(5.0)
+  updatedBy           String?
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+}
+
+model RewardsBalance {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  totalEarned    Float    @default(0)
+  totalSpent     Float    @default(0)
+  totalWithdrawn Float    @default(0)
+  currentBalance Float    @default(0)
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+}
+
+model RewardsTransaction {
+  id              String                  @id @default(cuid())
+  userId          String
+  user            User                    @relation(fields: [userId], references: [id])
+  orderId         String?
+  order           Order?                  @relation(fields: [orderId], references: [id])
+  type            RewardsTransactionType
+  amount          Float
+  balanceBefore   Float
+  balanceAfter    Float
+  description     String
+  referenceNumber String?                 @unique
+  processedBy     String?
+  createdAt       DateTime                @default(now())
+}
+
+model WalletBalance {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  totalAdded     Float    @default(0)
+  totalSpent     Float    @default(0)
+  currentBalance Float    @default(0)
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+}
+
+model WalletTransaction {
+  id            String                 @id @default(cuid())
+  userId        String
+  user          User                   @relation(fields: [userId], references: [id])
+  type          WalletTransactionType
+  amount        Float
+  balanceBefore Float
+  balanceAfter  Float
+  description   String
+  createdAt     DateTime               @default(now())
+}
+
+enum NotificationType {
+  POPUP
+  BELL
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  content   String           @db.Text
+  isActive  Boolean          @default(true)
+  createdBy String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  reads     NotificationRead[]
+}
+
+model NotificationRead {
+  id             String       @id @default(cuid())
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String
+  readAt         DateTime     @default(now())
+
+  @@unique([notificationId, userId])
+}
+
+model WithdrawalRequest {
+  id               String           @id @default(cuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id])
+  amount           Float
+  method           WithdrawalMethod
+  recipientDetails Json
+  status           WithdrawalStatus @default(PENDING)
+  processedBy      String?
+  processedAt      DateTime?
+  failedReason     String?
+  referenceNumber  String?          @unique
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}

@@ -1,0 +1,12 @@
+# Cloudflare Worker to proxy Reseller API requests to ghbundle.com
+# Use this when your server IP is blocked by Vercel Checkpoint (403 Forbidden)
+# Deploy: npx wrangler deploy
+# Docs: https://developers.cloudflare.com/workers/
+
+name = "ghbundle-reseller-api-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Set your production base URL
+[vars]
+TARGET_BASE_URL = "https://ghbundle.com"

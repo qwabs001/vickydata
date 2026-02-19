@@ -1,0 +1,659 @@
+openapi: 3.0.3
+info:
+  title: GhBundle Reseller API
+  version: 1.0.0
+  description: |
+    Reseller API for agents to fetch services, place wallet-funded orders,
+    track order status in real time, and subscribe to status webhooks.
+servers:
+  - url: https://ghbundle.com/api/v1
+    description: Production
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: Services
+  - name: Wallet
+  - name: Orders
+  - name: Webhooks
+paths:
+  /services:
+    get:
+      tags: [Services]
+      summary: List active services
+      description: Returns active data services for the authenticated agent with agent pricing.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - in: query
+          name: network
+          required: false
+          schema:
+            type: string
+          description: Filter by network name or display name.
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Services returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+              example:
+                services:
+                  - service_id: "cmabc123"
+                    network: "MTN"
+                    plan_name: "1GB"
+                    volume: "1GB"
+                    price: 4.0
+                    min_qty: 1
+                    max_qty: 10
+                    updated_at: "2026-02-18T10:18:00.000Z"
+                    status: "active"
+                pagination:
+                  page: 1
+                  limit: 50
+                  total: 120
+                  has_more: true
+        '401':
+          $ref: '#/components/responses/AuthError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /balance:
+    get:
+      tags: [Wallet]
+      summary: Get wallet balance
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+      responses:
+        '200':
+          description: Wallet balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+              example:
+                agent_id: "cma_agent_1"
+                wallet_balance: 120.55
+                currency: "GHS"
+        '401':
+          $ref: '#/components/responses/AuthError'
+
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Create order
+      description: |
+        Creates a wallet-funded order.
+        Idempotency is enforced by `client_order_id` per agent.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            example:
+              service_id: "cmabc123"
+              phone: "233245001122"
+              qty: 1
+              client_order_id: "agent-unique-123"
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+              example:
+                order_id: "ord_abc"
+                client_order_id: "agent-unique-123"
+                status: "pending"
+                amount: 12.5
+                currency: "GHS"
+                qty: 1
+                phone: "233******122"
+                provider_ref: null
+                service:
+                  service_id: "cmabc123"
+                  network: "MTN"
+                  plan_name: "1GB"
+                  volume: "1GB"
+                created_at: "2026-02-18T10:30:00.000Z"
+                updated_at: "2026-02-18T10:30:00.000Z"
+                completed_at: null
+                idempotent: false
+        '200':
+          description: Existing order returned for same client_order_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid request or insufficient balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                insufficient:
+                  value:
+                    error:
+                      code: INSUFFICIENT_BALANCE
+                      message: Wallet balance is too low for this order.
+                invalid:
+                  value:
+                    error:
+                      code: INVALID_REQUEST
+                      message: Invalid order payload.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/AuthError'
+
+    get:
+      tags: [Orders]
+      summary: List orders
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, processing, success, failed, canceled, refunded]
+        - in: query
+          name: from
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Orders list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/AuthError'
+
+  /orders/{order_id}:
+    get:
+      tags: [Orders]
+      summary: Get order status
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/AuthError'
+
+  /orders/{order_id}/cancel:
+    post:
+      tags: [Orders]
+      summary: Cancel pending order
+      description: Cancels only `pending` orders and returns wallet funds.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: Order canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Cannot cancel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: CONFLICT
+                  message: Order cannot be canceled once processing has started.
+
+  /webhooks:
+    post:
+      tags: [Webhooks]
+      summary: Subscribe webhook
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookSubscribeRequest'
+            example:
+              url: "https://agent.example.com/webhooks/ghbundle"
+              events: ["order.updated"]
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscription'
+              example:
+                id: "wh_abc"
+                url: "https://agent.example.com/webhooks/ghbundle"
+                events: ["order.updated"]
+                enabled: true
+                created_at: "2026-02-18T10:00:00.000Z"
+                secret: "ghs_..."
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+
+    get:
+      tags: [Webhooks]
+      summary: List webhook subscriptions
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+      responses:
+        '200':
+          description: Webhooks list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhooks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookSubscription'
+
+  /webhooks/{id}:
+    delete:
+      tags: [Webhooks]
+      summary: Delete webhook subscription
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+      description: Agent API key.
+
+  parameters:
+    XSignature:
+      in: header
+      name: X-SIGNATURE
+      required: true
+      schema:
+        type: string
+      description: |
+        HMAC SHA-256 signature computed on:
+        `METHOD + "\n" + PATH_WITH_QUERY + "\n" + RAW_BODY + "\n" + TIMESTAMP + "\n" + NONCE`
+    XTimestamp:
+      in: header
+      name: X-TIMESTAMP
+      required: true
+      schema:
+        type: string
+      description: Unix timestamp in seconds. Must be within 5 minutes.
+    XNonce:
+      in: header
+      name: X-NONCE
+      required: true
+      schema:
+        type: string
+      description: Unique nonce per request to prevent replay.
+    OrderIdParam:
+      in: path
+      name: order_id
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    Service:
+      type: object
+      properties:
+        service_id:
+          type: string
+        network:
+          type: string
+        plan_name:
+          type: string
+        volume:
+          type: string
+        price:
+          type: number
+          format: float
+        min_qty:
+          type: integer
+        max_qty:
+          type: integer
+        updated_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, inactive]
+      required: [service_id, network, plan_name, volume, price, min_qty, max_qty, updated_at, status]
+
+    BalanceResponse:
+      type: object
+      properties:
+        agent_id:
+          type: string
+        wallet_balance:
+          type: number
+          format: float
+        currency:
+          type: string
+      required: [agent_id, wallet_balance, currency]
+
+    CreateOrderRequest:
+      type: object
+      properties:
+        service_id:
+          type: string
+        phone:
+          type: string
+          example: "233245001122"
+        qty:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        client_order_id:
+          type: string
+      required: [service_id, phone, qty, client_order_id]
+
+    Order:
+      type: object
+      properties:
+        order_id:
+          type: string
+        client_order_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, success, failed, canceled, refunded]
+        amount:
+          type: number
+          format: float
+        currency:
+          type: string
+        qty:
+          type: integer
+        phone:
+          type: string
+          description: Masked phone number in status/list responses.
+        provider_ref:
+          type: string
+          nullable: true
+        service:
+          type: object
+          properties:
+            service_id:
+              type: string
+            network:
+              type: string
+            plan_name:
+              type: string
+            volume:
+              type: string
+          required: [service_id, network, plan_name, volume]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        idempotent:
+          type: boolean
+      required:
+        - order_id
+        - client_order_id
+        - status
+        - amount
+        - currency
+        - qty
+        - phone
+        - service
+        - created_at
+        - updated_at
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        has_more:
+          type: boolean
+      required: [page, limit, total, has_more]
+
+    WebhookSubscribeRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+          default: [order.updated]
+        secret:
+          type: string
+          nullable: true
+      required: [url]
+
+    WebhookSubscription:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        events:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        secret:
+          type: string
+          description: Returned only when server auto-generates the secret.
+          nullable: true
+      required: [id, url, events, enabled, created_at]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+          required: [code, message]
+      required: [error]
+
+  responses:
+    AuthError:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Missing authentication headers.
+    InvalidRequestError:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INVALID_REQUEST
+              message: Invalid request payload.
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: NOT_FOUND
+              message: Resource not found.
+    RateLimitError:
+      description: Too many requests
+      headers:
+        Retry-After:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: Rate limit exceeded. Try again shortly.

@@ -1,0 +1,496 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useAuth } from "@/frontend/hooks/useAuth";
+
+type ApiConfig = {
+  id: string;
+  provider: string;
+  name: string;
+  baseUrl: string;
+  hasApiKey: boolean;
+  isActive: boolean;
+};
+
+type ServiceStatus = {
+  ok: boolean;
+  message: string;
+  latencyMs?: number;
+};
+
+export default function Page() {
+  const { user } = useAuth();
+  const [configs, setConfigs] = useState<ApiConfig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [apiSecret, setApiSecret] = useState("");
+  const [baseUrl, setBaseUrl] = useState("https://datafraternity.com/api/v1");
+  const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
+  const [showToken, setShowToken] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+
+  const connected = configs.length > 0;
+  const activeConfig = configs.find((c) => c.isActive);
+
+  const loadConfigs = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/settings/api-config", {
+        headers: { "x-user-id": user.id }
+      });
+      const data = await res.json().catch(() => []);
+      setConfigs(Array.isArray(data) ? data : []);
+    } catch {
+      setError("Unable to load API configs.");
+      setConfigs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConfigs();
+  }, [user?.id]);
+
+  const showNotice = (msg: string) => {
+    setNotice(msg);
+    setError(null);
+    window.setTimeout(() => setNotice(null), 4000);
+  };
+
+  const handleConnect = async () => {
+    if (!user?.id || !apiKey.trim()) {
+      setError("Enter your API token.");
+      return;
+    }
+    const resolvedBaseUrl = baseUrl.trim();
+    if (!resolvedBaseUrl) {
+      setError("Base URL is required.");
+      return;
+    }
+    try {
+      new URL(resolvedBaseUrl);
+    } catch {
+      setError("Enter a valid Base URL (e.g. https://datafraternity.com/api/v1).");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const token = apiKey.trim();
+      const secret = apiSecret.trim() || token;
+      const payload = {
+        provider: "v1",
+        name: "Data Provider API",
+        apiKey: token,
+        apiSecret: secret,
+        baseUrl: resolvedBaseUrl,
+        endpoints: { test: "/normal-orders", purchase: "/normal-orders" }
+      };
+      const existing = configs.find((c) => c.provider === "v1");
+      const res = existing
+        ? await fetch(`/api/admin/settings/api-config/${existing.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "x-user-id": user.id },
+            body: JSON.stringify({
+              apiKey: token,
+              apiSecret: secret,
+              baseUrl: resolvedBaseUrl,
+              endpoints: payload.endpoints
+            })
+          })
+        : await fetch("/api/admin/settings/api-config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-id": user.id },
+            body: JSON.stringify(payload)
+          });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error ?? "Unable to connect.");
+        return;
+      }
+      showNotice("API connected successfully. You can now sync and fulfill orders.");
+      setApiKey("");
+      setApiSecret("");
+      loadConfigs();
+    } catch {
+      setError("Unable to connect.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTest = async (configId: string) => {
+    if (!user?.id) return;
+    setTesting(true);
+    setError(null);
+    setServiceStatus(null);
+    const start = Date.now();
+    try {
+      const res = await fetch("/api/admin/settings/api-config/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify({ configId })
+      });
+      const data = await res.json().catch(() => ({}));
+      const latencyMs = Date.now() - start;
+      if (data.ok) {
+        setServiceStatus({ ok: true, message: "Connection healthy", latencyMs });
+        showNotice("Connection test passed.");
+      } else {
+        setServiceStatus({ ok: false, message: data?.message ?? "Connection failed" });
+        setError(data?.message ?? "Connection failed.");
+      }
+    } catch {
+      setServiceStatus({ ok: false, message: "Connection failed" });
+      setError("Test failed.");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSync = async (configId: string) => {
+    if (!user?.id) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/settings/api-config/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify({ configId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.ok) {
+        showNotice(`Synced: ${data.networksAdded ?? 0} networks, ${data.plansAdded ?? 0} plans imported.`);
+        if (data.error) setError(data.error);
+      } else {
+        setError(data?.error ?? "Sync failed.");
+      }
+    } catch {
+      setError("Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleToggleActive = async (config: ApiConfig) => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`/api/admin/settings/api-config/${config.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify({ isActive: !config.isActive })
+      });
+      if (res.ok) {
+        showNotice(config.isActive ? "API disabled." : "API enabled.");
+        loadConfigs();
+      }
+    } catch {
+      setError("Unable to update.");
+    }
+  };
+
+  const handleDisconnect = async (config: ApiConfig) => {
+    if (!user?.id) return;
+    if (!confirm("Disconnect this API? Orders will no longer auto-fulfill.")) return;
+    try {
+      const res = await fetch(`/api/admin/settings/api-config/${config.id}`, {
+        method: "DELETE",
+        headers: { "x-user-id": user.id }
+      });
+      if (res.ok) {
+        showNotice("API disconnected.");
+        setServiceStatus(null);
+        loadConfigs();
+      }
+    } catch {
+      setError("Unable to disconnect.");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6 max-w-5xl">
+      <header>
+        <h1 className="text-2xl font-black text-[#0f172a]">API Configuration</h1>
+        <p className="text-sm text-slate-500">
+          Connect your data provider API to import services and auto-fulfill orders.
+        </p>
+      </header>
+
+      {notice ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {notice}
+        </div>
+      ) : null}
+      {error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {error}
+        </div>
+      ) : null}
+
+      {/* ── Status + Quick Actions ── */}
+      {connected && activeConfig ? (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Status</p>
+            <div className="mt-3 flex items-center gap-2">
+              <span className={`h-3 w-3 rounded-full ${activeConfig.isActive ? "bg-emerald-500" : "bg-slate-300"}`} />
+              <span className="text-lg font-bold text-slate-900">{activeConfig.isActive ? "Connected" : "Inactive"}</span>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Service Health</p>
+            <div className="mt-3">
+              {serviceStatus ? (
+                <div className="flex items-center gap-2">
+                  <span className={`h-3 w-3 rounded-full ${serviceStatus.ok ? "bg-emerald-500" : "bg-red-500"}`} />
+                  <span className={`text-sm font-semibold ${serviceStatus.ok ? "text-emerald-700" : "text-red-600"}`}>
+                    {serviceStatus.message}
+                  </span>
+                  {serviceStatus.latencyMs ? (
+                    <span className="text-xs text-slate-400">{serviceStatus.latencyMs}ms</span>
+                  ) : null}
+                </div>
+              ) : (
+                <span className="text-sm text-slate-500">Click &quot;Test&quot; to check</span>
+              )}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Quick Actions</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-full bg-[#2563eb] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                onClick={() => handleTest(activeConfig.id)}
+                disabled={testing}
+              >
+                {testing ? "Testing..." : "Test"}
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-600 disabled:opacity-60"
+                onClick={() => handleSync(activeConfig.id)}
+                disabled={syncing}
+              >
+                {syncing ? "Syncing..." : "Sync Services"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        {/* ── Connect / Update ── */}
+        <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_16px_40px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-bold text-[#0f172a]">{connected ? "Update API Credentials" : "Connect API"}</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Enter your data provider&apos;s Base URL and API Token to start importing services.
+          </p>
+          <div className="mt-6 space-y-5">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                API Base URL
+              </label>
+              <input
+                type="url"
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-[#f8fafc] px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                placeholder="https://datafraternity.com/api/v1"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-slate-400">The base URL of your provider&apos;s API</p>
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                API Token
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type={showToken ? "text" : "password"}
+                  className="flex-1 rounded-xl border border-slate-200 bg-[#f8fafc] px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  placeholder="Your API token (e.g. 4|Ko7j0xd...)"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-3 text-xs text-slate-500 hover:bg-slate-50"
+                  onClick={() => setShowToken(!showToken)}
+                  title={showToken ? "Hide" : "Show"}
+                >
+                  {showToken ? (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                  )}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-slate-400">Paste your provider token (include a prefix like &quot;Token&quot; or &quot;Bearer&quot; if required).</p>
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                API Secret (Optional)
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type={showSecret ? "text" : "password"}
+                  className="flex-1 rounded-xl border border-slate-200 bg-[#f8fafc] px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  placeholder="Custom signing secret"
+                  value={apiSecret}
+                  onChange={(e) => setApiSecret(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-3 text-xs text-slate-500 hover:bg-slate-50"
+                  onClick={() => setShowSecret(!showSecret)}
+                  title={showSecret ? "Hide" : "Show"}
+                >
+                  {showSecret ? (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  onClick={() => {
+                    const bytes = new Uint8Array(24);
+                    window.crypto.getRandomValues(bytes);
+                    const generated = Array.from(bytes)
+                      .map((b) => b.toString(16).padStart(2, "0"))
+                      .join("");
+                    setApiSecret(generated);
+                    setShowSecret(true);
+                  }}
+                >
+                  Generate
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                Leave empty to reuse API token as secret. Use this if your provider requires a separate signing secret.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="w-full rounded-xl bg-[#2563eb] py-3 text-sm font-semibold text-white disabled:opacity-60"
+              onClick={handleConnect}
+              disabled={saving || !apiKey.trim()}
+            >
+              {saving ? "Connecting..." : connected ? "Update Credentials" : "Connect"}
+            </button>
+          </div>
+        </section>
+
+        {/* ── Connected APIs ── */}
+        <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_16px_40px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-bold text-[#0f172a]">Connected Providers</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Manage your connected API integrations.
+          </p>
+          <div className="mt-6 space-y-4">
+            {loading ? (
+              <p className="py-8 text-center text-sm text-slate-500">Loading...</p>
+            ) : configs.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-[#f8fafc] p-8 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                  <svg viewBox="0 0 24 24" className="h-6 w-6 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                </div>
+                <p className="mt-4 text-sm font-medium text-slate-600">No API connected</p>
+                <p className="mt-1 text-xs text-slate-400">Enter your credentials on the left to get started.</p>
+              </div>
+            ) : (
+              configs.map((config) => (
+                <div
+                  key={config.id}
+                  className="rounded-2xl border border-slate-200 bg-[#f8fafc] p-5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${config.isActive ? "bg-emerald-100 text-emerald-600" : "bg-slate-200 text-slate-500"}`}>
+                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                          <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{config.name}</p>
+                        <p className="text-xs text-slate-500">{config.baseUrl}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(config)}
+                      className={`relative h-6 w-11 rounded-full transition ${config.isActive ? "bg-emerald-500" : "bg-slate-300"}`}
+                    >
+                      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${config.isActive ? "left-[22px]" : "left-0.5"}`} />
+                    </button>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded-full bg-[#2563eb] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                      onClick={() => handleTest(config.id)}
+                      disabled={testing}
+                    >
+                      {testing ? "Testing..." : "Test Connection"}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 disabled:opacity-60"
+                      onClick={() => handleSync(config.id)}
+                      disabled={syncing}
+                    >
+                      {syncing ? "Importing..." : "Import Services"}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-full border border-red-200 px-4 py-1.5 text-xs font-semibold text-red-600"
+                      onClick={() => handleDisconnect(config)}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ── How it works ── */}
+          <div className="mt-8 rounded-2xl border border-slate-200 bg-[#f8fafc] p-5">
+            <h3 className="text-sm font-bold text-slate-700">How it works</h3>
+            <ol className="mt-3 space-y-2 text-xs text-slate-500">
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-[10px] font-bold text-white">1</span>
+                <span>Enter your provider&apos;s <strong>Base URL</strong> and <strong>API Token</strong> and connect.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-[10px] font-bold text-white">2</span>
+                <span><strong>Test Connection</strong> to verify your credentials are working.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-[10px] font-bold text-white">3</span>
+                <span><strong>Import Services</strong> to pull networks &amp; plans into your catalog.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-[10px] font-bold text-white">4</span>
+                <span>Orders will auto-fulfill via the API when payment is confirmed.</span>
+              </li>
+            </ol>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}

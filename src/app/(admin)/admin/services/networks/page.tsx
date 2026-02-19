@@ -1,0 +1,1 @@
+export { default } from "@/frontend/app/(admin)/admin/services/networks/page";

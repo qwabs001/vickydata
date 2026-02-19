@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "ApiConfiguration" ADD COLUMN IF NOT EXISTS "markupPercent" DOUBLE PRECISION NOT NULL DEFAULT 0;

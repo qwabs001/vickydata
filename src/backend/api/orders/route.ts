@@ -1,0 +1,173 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/backend/lib/db/prisma";
+import { requireAdmin } from "@/backend/lib/middleware/admin";
+import { orderService } from "@/backend/services/orders/orderService";
+import { resolvePriceForUser } from "@/backend/services/agentPricingService";
+import { orderCreateSchema } from "@/shared/schemas/order.schema";
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
+    const scope = searchParams.get("scope");
+    const limitParam = Number(searchParams.get("limit") ?? "0");
+    const pageParam = Number(searchParams.get("page") ?? "1");
+
+    if (!userId && scope !== "all") {
+      return NextResponse.json({ orders: [] });
+    }
+
+    if (scope === "all") {
+      const auth = await requireAdmin(request);
+      if (!auth.ok) {
+        return auth.response;
+      }
+    }
+
+    // Run sync in background so response isn't delayed (sync can hit external provider API)
+    if (scope !== "all" && userId) {
+      void import("@/backend/services/dataProvider/dataProviderService").then(({ dataProviderService }) =>
+        dataProviderService.syncUserInProgressOrders(userId).catch((syncError) => {
+          console.error("Order status sync warning:", syncError);
+        })
+      );
+    }
+
+    const whereClause = scope === "all" ? undefined : { userId: userId as string };
+    const requestedLimit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(200, Math.floor(limitParam)) : 0;
+    const defaultLimit = scope === "all" ? 200 : 100;
+    const take = requestedLimit > 0 ? requestedLimit : defaultLimit;
+    const page = Math.max(1, Math.floor(pageParam) || 1);
+    const skip = (page - 1) * take;
+    const shouldPaginate = requestedLimit > 0;
+
+    const [orders, totalCount] = await Promise.all([
+      prisma.order.findMany({
+        where: whereClause,
+        include: {
+          network: true,
+          dataPlan: true,
+          user: scope === "all"
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take,
+        skip
+      }),
+      shouldPaginate ? prisma.order.count({ where: whereClause }) : Promise.resolve(null)
+    ]);
+
+    const cacheForCustomer = scope !== "all" ? "private, max-age=10, stale-while-revalidate=20" : undefined;
+    return NextResponse.json(
+      {
+      orders: orders.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        failedReason: order.failedReason ?? null,
+        amount: order.amount,
+        currency: order.currency,
+        recipientNumber: order.recipientNumber,
+        createdAt: order.createdAt.toISOString(),
+        network: order.network
+          ? {
+              id: order.network.id,
+              name: order.network.name,
+              displayName: order.network.displayName,
+              logoUrl: order.network.logoUrl
+            }
+          : undefined,
+        dataPlan: order.dataPlan
+          ? {
+              id: order.dataPlan.id,
+              name: order.dataPlan.name,
+              dataAmount: order.dataPlan.dataAmount,
+              validity: order.dataPlan.validity
+            }
+          : undefined,
+        user: order.user
+          ? {
+              id: order.user.id,
+              username: order.user.username,
+              phoneNumber: order.user.phoneNumber
+            }
+          : undefined
+      })),
+      ...(totalCount != null
+        ? {
+            pagination: {
+              page,
+              limit: take,
+              total: totalCount,
+              hasMore: page * take < totalCount
+            }
+          }
+        : take > 0
+          ? { pagination: { page, limit: take, hasMore: orders.length === take } }
+          : {})
+      },
+      cacheForCustomer ? { headers: { "Cache-Control": cacheForCustomer } } : {}
+    );
+  } catch (error) {
+    console.error("Order fetch error:", error);
+    return NextResponse.json({ error: "Unable to fetch orders." }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const parsed = orderCreateSchema
+      .extend({ userId: z.string().min(1) })
+      .safeParse(body);
+
+    if (!parsed.success) {
+      const message =
+        parsed.error.issues[0]?.message ?? "Invalid order payload.";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    const { userId, networkId, dataPlanId, recipientNumber, rewardToUse, useWallet } = parsed.data;
+    const plan = await prisma.dataPlan.findUnique({
+      where: { id: dataPlanId }
+    });
+
+    if (!plan) {
+      return NextResponse.json({ error: "Data plan not found." }, { status: 404 });
+    }
+
+    const effectiveAmount = await resolvePriceForUser(plan.price, userId);
+
+    const order = await orderService.createOrder({
+      userId,
+      networkId,
+      dataPlanId,
+      recipientNumber,
+      amount: effectiveAmount,
+      currency: plan.currency,
+      rewardToUse,
+      useWallet
+    });
+
+    // For wallet/paid orders, send to provider immediately
+    if (order.status === "PROCESSING" || order.paymentStatus === "COMPLETED") {
+      try {
+        const { dataProviderService } = await import("@/backend/services/dataProvider/dataProviderService");
+        const result = await dataProviderService.fulfillOrder(order.id);
+        console.log("[orders POST] Fulfillment result:", result);
+        if (!result.ok) {
+          console.error("[orders POST] Fulfillment failed:", result.error);
+        }
+      } catch (err) {
+        console.error("[orders POST] Order fulfillment error:", err);
+      }
+    }
+
+    return NextResponse.json({ ok: true, order });
+  } catch (error) {
+    console.error("Order create error:", error);
+    const message = error instanceof Error ? error.message : "Unable to create order.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
