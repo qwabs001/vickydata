@@ -295,15 +295,14 @@ export default function CustomerDashboardPage() {
     setAgentUpgradeError(null);
     try {
       const ref = `AGENT-UPGRADE-${user.id}-${Date.now()}`;
-      const response = await fetch("/api/payments/moolre/initialize", {
+      const response = await fetch("/api/payments/paystack/agent-upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          amount: 100,
+          amount: 300,
           currency: "GHS",
-          ref,
-          type: "agent_upgrade"
+          ref
         })
       });
       const data = await response.json().catch(() => null);
@@ -864,7 +863,7 @@ export default function CustomerDashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Upgrade to Agent</h3>
-              <p className="mt-1 text-sm text-slate-500">One-time activation fee: GH₵100.00</p>
+              <p className="mt-1 text-sm text-slate-500">One-time activation fee: GH₵300.00</p>
             </div>
             <button
               type="button"
@@ -892,10 +891,6 @@ export default function CustomerDashboardPage() {
                 <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#16a34a]" />
                 Get API access
               </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#16a34a]" />
-                Get a platform where you can resell your services
-              </li>
             </ul>
           </div>
 
@@ -911,7 +906,7 @@ export default function CustomerDashboardPage() {
             onClick={handleAgentUpgradeProceed}
             disabled={agentUpgradeSubmitting}
           >
-            {agentUpgradeSubmitting ? "Opening payment..." : "Proceed"}
+            {agentUpgradeSubmitting ? "Opening Paystack..." : "Proceed"}
           </button>
         </div>
       </Dialog>
