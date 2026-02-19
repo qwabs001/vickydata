@@ -52,23 +52,8 @@ export default function AgentWalletPage() {
     loadTransactions();
   }, [loadTransactions]);
 
-  // Reconcile any pending Moolre payments (in case redirect/callback was missed)
-  useEffect(() => {
-    if (!user?.id) return;
-    const reconcile = async () => {
-      try {
-        const res = await fetch(`/api/payments/moolre/reconcile?userId=${user.id}`);
-        const data = await res.json().catch(() => null);
-        if (data?.confirmed > 0) {
-          await refresh();
-          await loadTransactions();
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    reconcile();
-  }, [user?.id, refresh, loadTransactions]);
+  // Note: Paystack webhook handles payment verification automatically
+  // Removed Moolre reconcile - we're using Paystack now
 
   useEffect(() => {
     if (typeof document === "undefined") return;

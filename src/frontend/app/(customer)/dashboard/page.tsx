@@ -101,23 +101,8 @@ export default function CustomerDashboardPage() {
     }
   }, [user?.id, refreshOrders, refreshWallet]);
 
-  // Reconcile any pending Moolre payments (in case redirect/callback was missed)
-  useEffect(() => {
-    if (!user?.id) return;
-    const reconcile = async () => {
-      try {
-        const res = await fetch(`/api/payments/moolre/reconcile?userId=${user.id}`);
-        const data = await res.json().catch(() => null);
-        if (data?.confirmed > 0) {
-          await refreshOrders();
-          await refreshWallet();
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    reconcile();
-  }, [user?.id, refreshOrders, refreshWallet]);
+  // Note: Paystack webhook handles payment verification automatically
+  // Removed Moolre reconcile - we're using Paystack now
 
   // Hide mobile nav when Add Funds or Quick Buy bottom sheet is open
   useEffect(() => {
