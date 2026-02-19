@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Logo upload requires Cloudinary. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in your environment."
+            "File upload requires Cloudinary. Use the “Or use a logo URL” field below and paste a direct image link instead (no Cloudinary needed)."
         },
         { status: 503 }
       );

@@ -66,6 +66,11 @@ PAYSTACK_WEBHOOK_SECRET=whsec_xxxxx
 MOOLRE_API_USER=
 MOOLRE_PUB_KEY=
 MOOLRE_ACCOUNT_NUMBER=
+
+# Cloudinary (optional - for logo/file uploads, or use logo URL instead)
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 ```
 
 ### Step 3: Generate NEXTAUTH_SECRET

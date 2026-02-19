@@ -60,6 +60,8 @@ export default function Page() {
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [logoNotice, setLogoNotice] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [logoUrlInput, setLogoUrlInput] = useState("");
+  const [logoUrlSaving, setLogoUrlSaving] = useState(false);
   const [footer, setFooter] = useState<FooterSettings>(defaultFooter);
   const [contact, setContact] = useState<ContactSettings>(defaultContact);
   const [footerSaving, setFooterSaving] = useState(false);
@@ -108,6 +110,7 @@ export default function Page() {
         if (data.logoUrl) {
           setLogoPreview(data.logoUrl);
           setLogoUrl(data.logoUrl);
+          setLogoUrlInput(data.logoUrl);
           saveThemeSettings({ logoUrl: data.logoUrl });
         }
         if (data.footer) setFooter((prev) => ({ ...prev, ...data.footer }));
@@ -242,6 +245,53 @@ export default function Page() {
       setLogoNotice(message);
     } finally {
       setLogoUploading(false);
+    }
+  };
+
+  const handleSaveLogoUrl = async () => {
+    const url = logoUrlInput.trim();
+    if (!url) {
+      setLogoNotice("Enter a logo image URL.");
+      window.setTimeout(() => setLogoNotice(null), 2500);
+      return;
+    }
+    try {
+      new URL(url);
+    } catch {
+      setLogoNotice("Enter a valid URL (e.g. https://example.com/logo.png).");
+      window.setTimeout(() => setLogoNotice(null), 2500);
+      return;
+    }
+    if (!user?.id) {
+      setLogoNotice("Please log in again to save the logo.");
+      window.setTimeout(() => setLogoNotice(null), 2500);
+      return;
+    }
+    setLogoUrlSaving(true);
+    setLogoNotice(null);
+    try {
+      const res = await fetch("/api/admin/brand/logo", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify({ logoUrl: url })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Failed to save logo URL.");
+      }
+      setLogoPreview(url);
+      setLogoUrl(url);
+      setLogoFile(null);
+      setLogoName("");
+      saveThemeSettings({ logoUrl: url });
+      setLogoNotice("Logo URL saved. It will appear across the site.");
+      localStorage.setItem("theme:refresh", Date.now().toString());
+      window.dispatchEvent(new Event("theme:refresh"));
+      window.setTimeout(() => setLogoNotice(null), 2500);
+    } catch (error) {
+      setLogoNotice(error instanceof Error ? error.message : "Unable to save logo URL.");
+    } finally {
+      setLogoUrlSaving(false);
     }
   };
 
@@ -523,6 +573,9 @@ export default function Page() {
             <label className="text-xs font-semibold uppercase tracking-widest text-slate-500">
               Logo Upload
             </label>
+            <p className="mt-1 text-xs text-slate-400">
+              Upload a file (requires Cloudinary) or use a logo URL below (no Cloudinary needed).
+            </p>
             <div className="mt-3 flex items-center gap-4">
               <input
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"
@@ -543,6 +596,31 @@ export default function Page() {
               >
                 {logoUploading ? "Uploading..." : "Upload"}
               </button>
+            </div>
+            <div className="mt-4">
+              <label className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Or use a logo URL (no Cloudinary needed)
+              </label>
+              <p className="mt-1 text-xs text-slate-400">
+                Paste a direct link to your logo image (e.g. from your website or any image host).
+              </p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  type="url"
+                  value={logoUrlInput}
+                  onChange={(e) => setLogoUrlInput(e.target.value)}
+                  placeholder="https://example.com/logo.png"
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveLogoUrl}
+                  disabled={logoUrlSaving}
+                  className="rounded-full bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white disabled:opacity-70"
+                >
+                  {logoUrlSaving ? "Saving..." : "Save logo URL"}
+                </button>
+              </div>
             </div>
             {logoPreview ? (
               <div className="mt-4 flex items-center gap-3">
