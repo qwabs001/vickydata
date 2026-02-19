@@ -3,7 +3,7 @@ import { requireAdmin } from "@/backend/lib/middleware/admin";
 import { prisma } from "@/backend/lib/db/prisma";
 import { dataProviderService } from "@/backend/services/dataProvider/dataProviderService";
 
-type ActionType = "resend" | "cancel" | "complete" | "cancel_refund";
+type ActionType = "resend" | "cancel" | "complete" | "cancel_refund" | "deduct_wallet";
 
 async function refundToWallet(order: {
   id: string;
@@ -130,7 +130,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const action = body?.action as ActionType | undefined;
 
-    if (!action || !["resend", "cancel", "complete", "cancel_refund"].includes(action)) {
+    if (!action || !["resend", "cancel", "complete", "cancel_refund", "deduct_wallet"].includes(action)) {
       return NextResponse.json({ error: "Invalid action." }, { status: 400 });
     }
 
@@ -176,6 +176,59 @@ export async function POST(
         console.error("[Admin] Order complete SMS error:", smsErr);
       }
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "deduct_wallet") {
+      if (order.paymentMethod === "WALLET") {
+        return NextResponse.json({ error: "Order already paid from wallet." }, { status: 400 });
+      }
+      const amount = Number(order.amount) || 0;
+      if (amount <= 0) {
+        return NextResponse.json({ error: "Order has no amount to deduct." }, { status: 400 });
+      }
+      await prisma.$transaction(async (tx) => {
+        const wallet = await tx.walletBalance.findUnique({
+          where: { userId: order.userId }
+        });
+        const before = wallet?.currentBalance ?? 0;
+        const after = Math.round((before - amount) * 100) / 100;
+        if (after < 0) {
+          throw new Error("User wallet balance would go negative. Add funds first or use a different action.");
+        }
+        await tx.walletBalance.upsert({
+          where: { userId: order.userId },
+          create: {
+            userId: order.userId,
+            totalAdded: wallet?.totalAdded ?? 0,
+            totalSpent: amount,
+            currentBalance: after
+          },
+          update: {
+            totalSpent: { increment: amount },
+            currentBalance: after
+          }
+        });
+        await tx.walletTransaction.create({
+          data: {
+            userId: order.userId,
+            type: "SPENT",
+            amount,
+            balanceBefore: before,
+            balanceAfter: after,
+            description: `Admin correction: paid for order ${order.orderNumber}`
+          }
+        });
+        await tx.order.update({
+          where: { id },
+          data: {
+            paymentMethod: "WALLET",
+            paymentStatus: "COMPLETED",
+            status: order.status === "PENDING" ? "PROCESSING" : order.status,
+            processedBy: adminId ?? null
+          }
+        });
+      });
+      return NextResponse.json({ ok: true, message: "Wallet deducted and order updated." });
     }
 
     if (action === "cancel_refund") {

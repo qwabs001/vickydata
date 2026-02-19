@@ -122,7 +122,7 @@ export default function Page() {
     }
   };
 
-  const handleOrderAction = async (orderId: string, action: "resend" | "cancel" | "complete" | "cancel_refund") => {
+  const handleOrderAction = async (orderId: string, action: "resend" | "cancel" | "complete" | "cancel_refund" | "deduct_wallet") => {
     if (!user?.id) return;
     setActionLoadingId(orderId);
     setError(null);
@@ -338,6 +338,17 @@ export default function Page() {
                             >
                               Cancel With Refund
                             </button>
+                            {order.paymentMethod !== "WALLET" && order.amount > 0 ? (
+                              <button
+                                type="button"
+                                className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                                onClick={() => handleOrderAction(order.id, "deduct_wallet")}
+                                disabled={actionLoadingId === order.id}
+                                title="Deduct order amount from customer wallet (use when order was paid by wallet but not deducted)"
+                              >
+                                Deduct wallet (fix)
+                              </button>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>
@@ -445,6 +456,17 @@ export default function Page() {
                               >
                                 Cancel With Refund
                               </button>
+                              {order.paymentMethod !== "WALLET" && order.amount > 0 ? (
+                                <button
+                                  type="button"
+                                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                                  onClick={() => handleOrderAction(order.id, "deduct_wallet")}
+                                  disabled={actionLoadingId === order.id}
+                                  title="Deduct order amount from customer wallet (use when order was paid by wallet but not deducted)"
+                                >
+                                  Deduct wallet (fix)
+                                </button>
+                              ) : null}
                             </div>
                           ) : null}
                         </div>
