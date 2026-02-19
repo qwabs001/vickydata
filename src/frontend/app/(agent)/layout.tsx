@@ -195,7 +195,7 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
             <div className="flex items-center gap-3 px-6 py-6">
               {logoUrl ? (
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-                  <Image src={logoUrl} alt="GhBundle logo" width={36} height={36} priority className="h-full w-full object-contain" />
+                  <Image src={logoUrl} alt="Keldatagh logo" width={36} height={36} priority className="h-full w-full object-contain" />
                 </div>
               ) : (
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)] text-[#0f172a]">
@@ -204,7 +204,7 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
                   </svg>
                 </div>
               )}
-              <span className="text-lg font-black">GhBundle</span>
+              <span className="text-lg font-black">Keldatagh</span>
             </div>
 
             <div className="px-4">
@@ -271,10 +271,10 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
                   <div className="flex min-w-0 items-center gap-2">
                     {logoUrl ? (
                       <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white p-2">
-                        <Image src={logoUrl} alt="GhBundle logo" width={32} height={32} priority className="h-full w-full object-contain" />
+                        <Image src={logoUrl} alt="Keldatagh logo" width={32} height={32} priority className="h-full w-full object-contain" />
                       </div>
                     ) : null}
-                    <span className="text-lg font-black">GhBundle</span>
+                    <span className="text-lg font-black">Keldatagh</span>
                   </div>
                 </div>
 

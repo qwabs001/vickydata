@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Bolt,
   Loader2,
@@ -13,14 +13,12 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useNetworks } from "@/frontend/hooks/useNetworks";
-import { useAllDataPlans } from "@/frontend/hooks/useDataPlans";
+import { useDataPlans } from "@/frontend/hooks/useDataPlans";
 import { useTheme } from "@/frontend/providers/ThemeProvider";
 import { useLandingConfig } from "@/frontend/providers/LandingConfigProvider";
 import { formatCurrency, formatGhanaPhone } from "@/shared/utils/formatters";
 import { isValidGhanaPhone } from "@/shared/utils/validators";
 import { getDefaultRouteForRole } from "@/frontend/lib/authRoutes";
-import { LoginModal } from "@/frontend/components/landing/LoginModal";
-import { SignupModal } from "@/frontend/components/landing/SignupModal";
 import type { DataPlan, Network } from "@/shared/types";
 import Image from "next/image";
 
@@ -70,8 +68,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const Theme5: React.FC = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { user, isAuthenticated, login } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { networks } = useNetworks();
   const { logoUrl, footer: footerSettings, accent, primary } = useTheme();
   const { config } = useLandingConfig();
@@ -85,30 +82,20 @@ const Theme5: React.FC = () => {
   const [checkoutState, setCheckoutState] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [showSignup, setShowSignup] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loginNotice, setLoginNotice] = useState<string | null>(null);
-  const [isLoginSubmitting, setIsLoginSubmitting] = useState(false);
-  const [isSignupSubmitting, setIsSignupSubmitting] = useState(false);
-  const [signupError, setSignupError] = useState<string | null>(null);
 
   const selectedNetwork = useMemo(() => {
     if (!selectedNetworkKey) return null;
     return networks.find((network) => {
-      const normalizedName = normalizeName(network.name);
-      const normalizedDisplay = normalizeName(network.displayName);
+      const normalized = normalizeName(network.name);
       const card = NETWORK_CARD_CONFIG.find((c) => c.key === selectedNetworkKey);
-      return card?.matchers.some(
-        (matcher) => normalizedName.includes(matcher) || normalizedDisplay.includes(matcher)
-      );
+      return card?.matchers.some((matcher) => normalized.includes(matcher));
     }) || null;
   }, [networks, selectedNetworkKey]);
 
-  const { plans, loading: plansLoading } = useAllDataPlans();
+  const { plans } = useDataPlans(selectedNetwork?.id, selectedNetwork?.name);
 
   const primaryColor = accent || primary || "#f5c63d";
-  const brandName = "GhBundle";
+  const brandName = "Keldatagh";
 
   const primaryRgb = useMemo(() => {
     const fallback = { r: 245, g: 198, b: 61 };
@@ -132,23 +119,11 @@ const Theme5: React.FC = () => {
     document.head.appendChild(link);
   }, []);
 
-  useEffect(() => {
-    const authParam = searchParams?.get("auth") || searchParams?.get("login");
-    if (authParam === "login" && !isAuthenticated) {
-      setShowLogin(true);
-      setLoginError(null);
-      setLoginNotice(null);
-    }
-  }, [searchParams, isAuthenticated]);
-
   const networkCards = useMemo(() => {
     return NETWORK_CARD_CONFIG.map((card) => {
       const matchedNetwork = networks.find((network) => {
-        const normalizedName = normalizeName(network.name);
-        const normalizedDisplay = normalizeName(network.displayName);
-        return card.matchers.some(
-          (matcher) => normalizedName.includes(matcher) || normalizedDisplay.includes(matcher)
-        );
+        const normalized = normalizeName(network.name);
+        return card.matchers.some((matcher) => normalized.includes(matcher));
       });
 
       const networkPlans = plans.filter((plan) => {
@@ -204,143 +179,12 @@ const Theme5: React.FC = () => {
 
   const handleStartNow = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setShowSignup(true);
-    setSignupError(null);
+    router.push("/signin");
   };
 
   const handleNavigation = (e: React.MouseEvent<HTMLButtonElement>, url: string) => {
     e.preventDefault();
     router.push(url);
-  };
-
-  const handleLogin = async (payload: { username: string; password: string }) => {
-    setIsLoginSubmitting(true);
-    setLoginError(null);
-    setLoginNotice(null);
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        setLoginError(data?.error ?? "Unable to login. Please try again.");
-        return;
-      }
-
-      const loggedInUser = await response.json();
-      login(loggedInUser);
-      setShowLogin(false);
-      router.push(getDefaultRouteForRole(loggedInUser.role));
-    } catch (err) {
-      setLoginError("Unable to login. Please try again.");
-    } finally {
-      setIsLoginSubmitting(false);
-    }
-  };
-
-  const handleSignup = async (payload: {
-    username: string;
-    phoneNumber: string;
-    password: string;
-    confirmPassword: string;
-  }) => {
-    // Ensure phone number has +233 prefix
-    let phoneNumber = payload.phoneNumber.trim();
-    if (!phoneNumber.startsWith("+233")) {
-      // Remove any existing +233 or 0 prefix and add +233
-      const digits = phoneNumber.replace(/^\+233|^0/, "").replace(/\D/g, "");
-      if (digits.length >= 9) {
-        phoneNumber = `+233${digits}`;
-      } else {
-        setSignupError("Enter a valid Ghana phone number.");
-        return;
-      }
-    }
-
-    if (!isValidGhanaPhone(phoneNumber)) {
-      setSignupError("Enter a valid Ghana phone number.");
-      return;
-    }
-
-    setIsSignupSubmitting(true);
-    setSignupError(null);
-    try {
-      // Get referral code from URL if present - use undefined instead of null for Zod
-      const refParam = searchParams?.get("ref");
-      const referralCode = refParam && refParam.trim().length >= 3 ? refParam.trim() : undefined;
-      
-      const signupPayload: {
-        username: string;
-        phoneNumber: string;
-        password: string;
-        confirmPassword: string;
-        referralCode?: string;
-      } = {
-        username: payload.username,
-        phoneNumber,
-        password: payload.password,
-        confirmPassword: payload.confirmPassword
-      };
-      
-      // Only include referralCode if it exists
-      if (referralCode) {
-        signupPayload.referralCode = referralCode;
-      }
-      
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(signupPayload),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        setSignupError(data?.error ?? "Unable to create account.");
-        return;
-      }
-
-      const newUser = await response.json();
-      login(newUser);
-      setShowSignup(false);
-      router.push(getDefaultRouteForRole(newUser.role));
-    } catch {
-      setSignupError("Unable to create account.");
-    } finally {
-      setIsSignupSubmitting(false);
-    }
-  };
-
-  const handleResetPassword = async (payload: {
-    username: string;
-    phoneNumber: string;
-    password: string;
-    confirmPassword: string;
-  }) => {
-    setIsLoginSubmitting(true);
-    setLoginError(null);
-    setLoginNotice(null);
-    try {
-      const response = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        setLoginError(data?.error ?? "Unable to reset password.");
-        return;
-      }
-
-      setLoginNotice("Password updated. Please login.");
-    } catch (err) {
-      setLoginError("Unable to reset password.");
-    } finally {
-      setIsLoginSubmitting(false);
-    }
   };
 
   const handleSecurePay = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -350,9 +194,7 @@ const Theme5: React.FC = () => {
     if (!isAuthenticated || !user?.id) {
       setCheckoutState("error");
       setCheckoutMessage("Please login first to complete payment and create order.");
-      setShowLogin(true);
-      setLoginError(null);
-      setLoginNotice(null);
+      router.push("/signin");
       return;
     }
 
@@ -375,7 +217,7 @@ const Theme5: React.FC = () => {
 
     try {
       const ref = `ORDER-${user.id}-${Date.now()}`;
-      const response = await fetch("/api/payments/paystack/initialize", {
+      const response = await fetch("/api/payments/moolre/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -474,16 +316,7 @@ const Theme5: React.FC = () => {
           <div className="hidden items-center gap-3 md:flex">
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                if (isAuthenticated) {
-                  router.push(getDefaultRouteForRole(user?.role));
-                } else {
-                  setShowLogin(true);
-                  setLoginError(null);
-                  setLoginNotice(null);
-                }
-              }}
+              onClick={(e) => handleNavigation(e, isAuthenticated ? getDefaultRouteForRole(user?.role) : "/signin")}
               className="rounded-full px-4 py-2 text-sm font-semibold text-[#1a1610] transition-colors hover:bg-[#ebe6dc]"
             >
               {isAuthenticated ? "Dashboard" : "Login"}
@@ -513,25 +346,14 @@ const Theme5: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowLogin(true);
-                  setLoginError(null);
-                  setLoginNotice(null);
-                  setMobileMenuOpen(false);
-                }}
+                onClick={(e) => handleNavigation(e, "/signin")}
                 className="rounded-xl border border-[#ddd4c6] bg-white px-3 py-2 text-sm font-semibold text-[#1b1710]"
               >
                 Login
               </button>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowSignup(true);
-                  setSignupError(null);
-                  setMobileMenuOpen(false);
-                }}
+                onClick={(e) => handleNavigation(e, "/signin")}
                 className="rounded-xl px-3 py-2 text-sm font-bold text-[#16120b]"
                 style={{ backgroundColor: primaryColor }}
               >
@@ -675,12 +497,7 @@ const Theme5: React.FC = () => {
               />
 
               <p className="mt-5 text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">Choose Data Package</p>
-              {plansLoading ? (
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e5ddcf] bg-[#fbfaf8] px-4 py-4 text-sm text-[#746b5e]">
-                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                  Loading packages…
-                </div>
-              ) : filteredPlans.length > 0 ? (
+              {filteredPlans.length > 0 ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {filteredPlans.map((plan) => {
                     const selected = selectedPlan?.id === plan.id;
@@ -797,63 +614,19 @@ const Theme5: React.FC = () => {
       </main>
 
       <footer className="border-t border-[#e8e2d7] bg-[#f8f6f3] py-4 text-center text-xs text-[#887f72] md:py-3">
-        copyright 2026 - GhBundle
+        copyright 2026 - Keldatagh
       </footer>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8e2d7] bg-[#f8f7f4]/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">
         <button
           type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            setShowSignup(true);
-            setSignupError(null);
-          }}
+          onClick={(e) => handleNavigation(e, "/signin")}
           className="flex w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-extrabold text-[#17120a] shadow-[inset_0_-2px_0_rgba(0,0,0,0.16)]"
           style={{ backgroundColor: primaryColor }}
         >
           Create Free Account
         </button>
       </div>
-
-      <LoginModal
-        open={showLogin}
-        onClose={() => {
-          setShowLogin(false);
-          setLoginError(null);
-          setLoginNotice(null);
-        }}
-        onSubmit={handleLogin}
-        onResetPassword={handleResetPassword}
-        onRegisterClick={() => {
-          setShowLogin(false);
-          setShowSignup(true);
-          setSignupError(null);
-        }}
-        isSubmitting={isLoginSubmitting}
-        error={loginError}
-        notice={loginNotice}
-        mobileSheet={true}
-      />
-
-      <SignupModal
-        open={showSignup}
-        onClose={() => {
-          setShowSignup(false);
-          setSignupError(null);
-        }}
-        onLoginClick={() => {
-          setShowSignup(false);
-          setShowLogin(true);
-          setLoginError(null);
-          setLoginNotice(null);
-        }}
-        phoneNumber={recipientNumber}
-        editablePhoneNumber={true}
-        onSubmit={handleSignup}
-        isSubmitting={isSignupSubmitting}
-        error={signupError}
-        mobileSheet={true}
-      />
     </div>
   );
 };

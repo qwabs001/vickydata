@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "Compare data bundle prices in Ghana and buy cheap data instantly with GhBundle.",
+  description: "Compare data bundle prices in Ghana and buy cheap data instantly with Keldatagh.",
   alternates: { canonical: "/pricing" }
 };
 
@@ -17,7 +17,7 @@ export default function PricingPage() {
             Data Bundle Prices That Save You More
           </h1>
           <p className="mt-3 text-sm text-slate-600 md:text-base">
-            GhBundle gives you competitive pricing across all major Ghana networks. Check the latest bundle prices and buy in seconds.
+            Keldatagh gives you competitive pricing across all major Ghana networks. Check the latest bundle prices and buy in seconds.
           </p>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">

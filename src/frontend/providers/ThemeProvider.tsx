@@ -93,11 +93,8 @@ const applyPrimary = (primary: string) => {
   document.documentElement.style.setProperty("--primary-rgb", `${r} ${g} ${b}`);
 };
 
-const DEFAULT_FAVICON = "/images/networks/ghbundlw.png?v=2";
-
 const applyBrandIcon = (logoUrl?: string) => {
-  if (typeof document === "undefined") return;
-  const href = logoUrl || DEFAULT_FAVICON;
+  if (typeof document === "undefined" || !logoUrl) return;
   const head = document.head;
   const rels = ["icon", "apple-touch-icon"];
   rels.forEach((rel) => {
@@ -107,7 +104,7 @@ const applyBrandIcon = (logoUrl?: string) => {
       link.rel = rel;
       head.appendChild(link);
     }
-    link.href = href;
+    link.href = logoUrl;
   });
 };
 
@@ -139,10 +136,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
       const stored = loadThemeSettings();
       const nextAccent = data.accent ?? stored.accent;
       const nextPrimary = data.primary ?? stored.primary;
-      const hasLogoKey = Object.prototype.hasOwnProperty.call(data, "logoUrl");
-      const nextLogo = hasLogoKey
-        ? (typeof data.logoUrl === "string" ? data.logoUrl.trim() : "")
-        : (stored.logoUrl ?? "");
+      const nextLogo = data.logoUrl ?? stored.logoUrl ?? "";
       setAccentState(nextAccent);
       setPrimaryState(nextPrimary);
       setLogoUrlState(nextLogo || undefined);
@@ -205,7 +199,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
   const setLogoUrl = useCallback((url: string) => {
     const next = url?.trim();
     setLogoUrlState(next || undefined);
-    saveThemeSettings({ logoUrl: next ?? undefined });
+    saveThemeSettings({ logoUrl: next || undefined });
     applyBrandIcon(next || undefined);
   }, []);
 
