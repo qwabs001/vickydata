@@ -28,6 +28,15 @@ export const prisma =
     log: process.env.NODE_ENV === "development" ? ["query", "error"] : ["error"]
   });
 
-if (process.env.NODE_ENV !== "production") {
+// Always use singleton pattern to prevent multiple Prisma instances
+// This is critical in serverless environments like Vercel
+if (!globalForPrisma.prisma) {
   globalForPrisma.prisma = prisma;
+}
+
+// Properly disconnect on process termination
+if (typeof process !== "undefined") {
+  process.on("beforeExit", async () => {
+    await prisma.$disconnect();
+  });
 }
