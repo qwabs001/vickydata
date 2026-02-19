@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/backend/lib/db/prisma";
 import { requireAdmin } from "@/backend/lib/middleware/admin";
+import { isDatabaseConnectionError } from "@/backend/lib/utils/dbError";
 
 const endpointsSchema = z.object({
   networks: z.string().optional(),
@@ -49,6 +50,12 @@ export async function GET(
     });
   } catch (error) {
     console.error("API config get error:", error);
+    if (isDatabaseConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: "Unable to load API config." }, { status: 500 });
   }
 }
@@ -107,6 +114,12 @@ export async function PATCH(
     });
   } catch (error) {
     console.error("API config update error:", error);
+    if (isDatabaseConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: "Unable to update API config." }, { status: 500 });
   }
 }
@@ -124,6 +137,12 @@ export async function DELETE(
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("API config delete error:", error);
+    if (isDatabaseConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: "Unable to delete API config." }, { status: 500 });
   }
 }

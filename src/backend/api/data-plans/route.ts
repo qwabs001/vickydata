@@ -4,6 +4,7 @@ import { dataPlanService } from "@/backend/services/dataPlans/dataPlanService";
 import { prisma } from "@/backend/lib/db/prisma";
 import { requireAdmin } from "@/backend/lib/middleware/admin";
 import { getRequestIp, recordActivity } from "@/backend/lib/activityLog";
+import { isDatabaseConnectionError } from "@/backend/lib/utils/dbError";
 import {
   applyAgentDiscount,
   getAgentPricingContext
@@ -85,6 +86,12 @@ export async function GET(request: Request) {
     return NextResponse.json([]);
   } catch (error) {
     console.error("Data plan fetch error:", error);
+    if (isDatabaseConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to fetch data plans." },
       { status: 500 }

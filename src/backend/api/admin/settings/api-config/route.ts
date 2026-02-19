@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/backend/lib/db/prisma";
 import { requireAdmin } from "@/backend/lib/middleware/admin";
+import { isDatabaseConnectionError } from "@/backend/lib/utils/dbError";
 
 const endpointsSchema = z.object({
   networks: z.string().optional(),
@@ -16,7 +17,17 @@ const createSchema = z.object({
   name: z.string().min(1),
   apiKey: z.string().min(1),
   apiSecret: z.string().optional(),
-  baseUrl: z.string().url(),
+  baseUrl: z.string().min(1).transform((s) => s.trim()).refine(
+    (s) => {
+      try {
+        const u = new URL(s);
+        return u.protocol === "http:" || u.protocol === "https:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "Base URL must be a valid http(s) URL" }
+  ),
   endpoints: endpointsSchema
 });
 
@@ -46,6 +57,12 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error("API config list error:", error);
+    if (isDatabaseConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: "Unable to load API configs." }, { status: 500 });
   }
 }
@@ -80,8 +97,9 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         apiKey: parsed.data.apiKey,
         apiSecret: parsed.data.apiSecret ?? parsed.data.apiKey,
-        baseUrl: parsed.data.baseUrl,
-        endpoints: (parsed.data.endpoints ?? {}) as object
+        baseUrl: parsed.data.baseUrl.replace(/\/+$/, ""),
+        endpoints: (parsed.data.endpoints ?? {}) as object,
+        networkId: null
       }
     });
 
@@ -97,6 +115,13 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("API config create error:", error);
-    return NextResponse.json({ error: "Unable to create API config." }, { status: 500 });
+    if (isDatabaseConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
+    const msg = error instanceof Error ? error.message : "Unable to create API config.";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
