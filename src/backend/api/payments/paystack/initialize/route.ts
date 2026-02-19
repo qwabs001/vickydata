@@ -58,6 +58,15 @@ export async function POST(request: Request) {
     const { paystack } = await getPaymentSettings();
     const secretKey = paystack.secretKey || process.env.PAYSTACK_SECRET_KEY || "";
 
+    console.log("[Paystack Initialize] Settings check:", {
+      hasDbSecretKey: !!paystack.secretKey,
+      hasEnvSecretKey: !!process.env.PAYSTACK_SECRET_KEY,
+      secretKeyLength: secretKey.length,
+      userId,
+      amount,
+      type
+    });
+
     if (!secretKey) {
       return NextResponse.json(
         { error: "Paystack credentials not configured. Please configure Paystack in Admin → Payment Settings." },
@@ -108,11 +117,26 @@ export async function POST(request: Request) {
     const returnUrl = `${baseUrl.replace(/\/$/, "")}${returnPath}?payment=success`;
 
     // Initialize Paystack payment
+    // Ensure we have a valid email for Paystack
+    let userEmail = user.fullName || user.username || user.phoneNumber || "customer";
+    // If it doesn't look like an email, make it one
+    if (!userEmail.includes("@")) {
+      userEmail = `${userEmail.replace(/[^a-zA-Z0-9]/g, "")}@keldatagh.com`;
+    }
+    
+    console.log("[Paystack Initialize] Initializing payment:", {
+      orderId: orderId || userId,
+      orderNumber: ref,
+      amount: chargeAmount,
+      email: userEmail,
+      callbackUrl
+    });
+
     const paymentResult = await paystackService.initializePayment({
       orderId: orderId || userId, // Use orderId if available, otherwise userId for wallet
       orderNumber: ref,
       amount: chargeAmount,
-      email: user.fullName || user.username || `${user.phoneNumber}@keldatagh.com`,
+      email: userEmail,
       callbackUrl,
       secretKey
     });
@@ -171,9 +195,14 @@ export async function POST(request: Request) {
       reference: paymentResult.reference
     });
   } catch (error) {
-    console.error("Paystack initialize error:", error);
+    console.error("[Paystack Initialize] Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unable to initialize payment.";
+    console.error("[Paystack Initialize] Error details:", {
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to initialize payment." },
+      { error: errorMessage },
       { status: 500 }
     );
   }

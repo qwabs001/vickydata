@@ -35,16 +35,35 @@ export const paystackService = {
           callback_url: params.callbackUrl ?? `${baseUrl}/orders?ref=${reference}`
         })
       });
-      const data = (await res.json()) as { status?: boolean; data?: { authorization_url?: string }; message?: string };
+      
+      const data = (await res.json()) as { 
+        status?: boolean; 
+        data?: { authorization_url?: string }; 
+        message?: string;
+        errors?: any;
+      };
+      
+      console.log("[Paystack Service] Response status:", res.status);
+      console.log("[Paystack Service] Response data:", JSON.stringify(data, null, 2));
+      
+      if (!res.ok) {
+        const errorMsg = data.message || `Paystack API returned status ${res.status}`;
+        console.error("[Paystack Service] API error:", errorMsg, data.errors);
+        throw new Error(errorMsg);
+      }
+      
       if (data.status && data.data?.authorization_url) {
         return {
           paymentUrl: data.data.authorization_url,
           reference
         };
       }
-      throw new Error(data.message || "Failed to initialize Paystack payment");
+      
+      const errorMsg = data.message || "Paystack did not return a payment URL";
+      console.error("[Paystack Service] Missing payment URL:", errorMsg, data);
+      throw new Error(errorMsg);
     } catch (error) {
-      console.error("Paystack initialize error:", error);
+      console.error("[Paystack Service] Initialize error:", error);
       throw error instanceof Error ? error : new Error("Failed to initialize payment");
     }
   },
