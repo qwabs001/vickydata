@@ -19,11 +19,18 @@ function getDatabaseUrl(): string {
   // Use connection_limit=1 per function instance to minimize pool exhaustion
   const withLimit = withSsl.includes("connection_limit=") ? withSsl : append(withSsl, "connection_limit=1");
 
-  // Warn if using direct connection instead of pooler in production
-  if (process.env.NODE_ENV === "production" && url.includes("db.") && url.includes(".supabase.co:5432")) {
-    console.warn(
-      "[Prisma] Using direct connection URL. For serverless (Vercel), use the session pooler URL (port 5432 with pooler.supabase.com) to avoid MaxClientsInSessionMode errors."
-    );
+  // Warn if using direct connection or session mode (5432) on Vercel — use transaction mode (6543) instead
+  if (process.env.VERCEL === "1") {
+    if (url.includes("db.") && url.includes(".supabase.co")) {
+      console.warn(
+        "[Prisma] Use the pooler URL (pooler.supabase.com), not the direct db. URL. See DATABASE_VERCEL_FIX.md"
+      );
+    }
+    if (url.includes("pooler.supabase.com:5432") && !url.includes("6543")) {
+      console.warn(
+        "[Prisma] Port 5432 (session mode) often causes 'Database temporarily unavailable' on Vercel. Use port 6543 with ?pgbouncer=true — see DATABASE_VERCEL_FIX.md"
+      );
+    }
   }
 
   return withLimit;
