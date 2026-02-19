@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { signupSchema } from "@/shared/schemas/auth.schema";
 import { authService } from "@/backend/services/auth/authService";
+import { isDatabaseConnectionError } from "@/backend/lib/utils/dbError";
 
 export async function POST(request: Request) {
   try {
@@ -20,7 +21,12 @@ export async function POST(request: Request) {
     );
 
     if (!result.ok) {
-      return NextResponse.json({ error: result.reason }, { status: 400 });
+      // Return 503 for database connection errors, 400 for validation errors
+      const isConnectionError = result.reason.includes("temporarily unavailable");
+      return NextResponse.json(
+        { error: result.reason },
+        { status: isConnectionError ? 503 : 400 }
+      );
     }
 
     const user = result.user;
@@ -32,6 +38,12 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Signup error:", error);
+    if (isDatabaseConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
     const message =
       error instanceof Error ? error.message : "Unable to create account.";
     return NextResponse.json({ error: message }, { status: 500 });

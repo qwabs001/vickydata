@@ -76,15 +76,20 @@ export const authService = {
       });
       return { ok: true, user } as const;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       if (error instanceof Prisma.PrismaClientInitializationError) {
-        return { ok: false, reason: "Database unavailable. Check the connection string." } as const;
+        return { ok: false, reason: "Service temporarily unavailable. Please try again in a moment." } as const;
+      }
+      if (errorMessage.includes("MaxClientsInSessionMode") || errorMessage.includes("connection")) {
+        return { ok: false, reason: "Service temporarily unavailable. Please try again in a moment." } as const;
       }
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2002") {
           return { ok: false, reason: "Username or phone number already exists." } as const;
         }
       }
-      return { ok: false, reason: "Unable to create account." } as const;
+      console.error("[AuthService] createUser error:", error);
+      return { ok: false, reason: "Unable to create account. Please try again." } as const;
     }
   },
 
