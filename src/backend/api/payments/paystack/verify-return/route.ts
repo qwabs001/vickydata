@@ -18,14 +18,16 @@ export async function GET(request: Request) {
     }
 
     const { paystack } = await getPaymentSettings();
-    const secretKey = paystack.secretKey || process.env.PAYSTACK_SECRET_KEY;
+    const secretKey = paystack.secretKey || process.env.PAYSTACK_SECRET_KEY || "";
     if (!secretKey) {
       return NextResponse.json({ error: "Paystack not configured", credited: false }, { status: 500 });
     }
 
-    const verified = await paystackService.verifyPayment(reference);
+    const verified = await paystackService.verifyPayment(reference, secretKey);
     if (!verified.ok) {
-      return NextResponse.json({ error: "Payment not verified", credited: false }, { status: 400 });
+      const msg = verified.message || "Payment not verified";
+      console.warn("[Paystack verify-return] Verification failed:", reference, msg);
+      return NextResponse.json({ error: msg, credited: false }, { status: 400 });
     }
 
     const paymentIntent = await prisma.paymentIntent.findUnique({

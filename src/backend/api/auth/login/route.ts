@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { loginSchema } from "@/shared/schemas/auth.schema";
 import { authService } from "@/backend/services/auth/authService";
+import { isDatabaseConnectionError } from "@/backend/lib/utils/dbError";
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +32,12 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Login error:", error);
+    if (isDatabaseConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Login failed." },
       { status: 500 }

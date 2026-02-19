@@ -68,28 +68,33 @@ export const paystackService = {
     }
   },
 
-  async verifyPayment(reference: string): Promise<{ ok: boolean; orderId?: string }> {
-    const secretKey = process.env.PAYSTACK_SECRET_KEY;
-    if (secretKey) {
-      try {
-        const res = await fetch(
-          `${PAYSTACK_URL}/transaction/verify/${encodeURIComponent(reference)}`,
-          { headers: { Authorization: `Bearer ${secretKey}` } }
-        );
-        const data = (await res.json()) as {
-          status?: boolean;
-          data?: { status?: string; metadata?: { orderId?: string } };
-        };
-        if (data.status && data.data?.status === "success") {
-          return { ok: true, orderId: data.data?.metadata?.orderId };
-        }
-      } catch {
-        /* fallback */
+  async verifyPayment(
+    reference: string,
+    secretKeyOverride?: string | null
+  ): Promise<{ ok: boolean; orderId?: string; message?: string }> {
+    const secretKey = secretKeyOverride ?? process.env.PAYSTACK_SECRET_KEY ?? "";
+    if (!secretKey) {
+      console.error("[Paystack verify] No secret key (use Admin Payment Settings or PAYSTACK_SECRET_KEY)");
+      return { ok: false, message: "Paystack not configured" };
+    }
+    try {
+      const res = await fetch(
+        `${PAYSTACK_URL}/transaction/verify/${encodeURIComponent(reference)}`,
+        { headers: { Authorization: `Bearer ${secretKey}` } }
+      );
+      const data = (await res.json()) as {
+        status?: boolean;
+        message?: string;
+        data?: { status?: string; metadata?: { orderId?: string } };
+      };
+      if (data.status && data.data?.status === "success") {
+        return { ok: true, orderId: data.data?.metadata?.orderId };
       }
+      console.warn("[Paystack verify] Unexpected response:", res.status, data.message ?? data);
+      return { ok: false, message: data.message ?? "Verification failed" };
+    } catch (err) {
+      console.error("[Paystack verify] Request error:", err);
+      return { ok: false, message: err instanceof Error ? err.message : "Verification request failed" };
     }
-    if (process.env.NODE_ENV !== "production" && reference.startsWith("PAY-")) {
-      return { ok: true };
-    }
-    return { ok: false };
   }
 };

@@ -16,7 +16,15 @@ function getDatabaseUrl(): string {
   const withSsl = hasSsl ? url : append(url, "sslmode=require");
 
   // Reduce connection pressure in serverless environments.
+  // Use connection_limit=1 per function instance to minimize pool exhaustion
   const withLimit = withSsl.includes("connection_limit=") ? withSsl : append(withSsl, "connection_limit=1");
+
+  // Warn if using direct connection instead of pooler in production
+  if (process.env.NODE_ENV === "production" && url.includes("db.") && url.includes(".supabase.co:5432")) {
+    console.warn(
+      "[Prisma] Using direct connection URL. For serverless (Vercel), use the session pooler URL (port 5432 with pooler.supabase.com) to avoid MaxClientsInSessionMode errors."
+    );
+  }
 
   return withLimit;
 }

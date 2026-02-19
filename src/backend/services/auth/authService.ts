@@ -89,10 +89,21 @@ export const authService = {
   },
 
   async validateUser(username: string, password: string) {
-    const user = await prisma.user.findUnique({ where: { username } });
-    if (!user) return null;
-    const valid = await comparePassword(password, user.password);
-    return valid ? user : null;
+    try {
+      const user = await prisma.user.findUnique({ where: { username } });
+      if (!user) return null;
+      const valid = await comparePassword(password, user.password);
+      return valid ? user : null;
+    } catch (error) {
+      // Re-throw connection errors so the route can handle them appropriately
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("MaxClientsInSessionMode") || msg.includes("connection")) {
+        throw error;
+      }
+      // For other errors, return null (user not found/invalid)
+      console.error("[AuthService] validateUser error:", error);
+      return null;
+    }
   },
 
   async resetPassword(username: string, phoneNumber: string, password: string) {
