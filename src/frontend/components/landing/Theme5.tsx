@@ -249,10 +249,16 @@ const Theme5: React.FC = () => {
     setIsSignupSubmitting(true);
     setSignupError(null);
     try {
+      // Get referral code from URL if present
+      const referralCode = searchParams?.get("ref") || null;
+      
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          referralCode
+        }),
       });
 
       if (!response.ok) {

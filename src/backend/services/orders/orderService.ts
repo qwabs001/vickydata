@@ -131,7 +131,7 @@ export const orderService = {
   async grantRewardsForCompletedOrder(orderId: string): Promise<void> {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { user: { select: { referredById: true, username: true } } }
+      include: { user: { select: { referredById: true, username: true, referralRewardedAt: true } } }
     });
     if (!order || order.status !== "COMPLETED") return;
 
@@ -139,8 +139,8 @@ export const orderService = {
     const user = order.user;
 
     await prisma.$transaction(async (tx) => {
-      // Referral cashback (0.5%) to referrer
-      if (user?.referredById && netAmount > 0) {
+      // Referral cashback (0.5%) to referrer - ONLY on first payment/order
+      if (user?.referredById && netAmount > 0 && !user.referralRewardedAt) {
         const referralReward = Math.round(netAmount * 0.005 * 100) / 100;
         if (referralReward > 0) {
           const existing = await tx.rewardsBalance.findUnique({
@@ -170,9 +170,14 @@ export const orderService = {
               amount: referralReward,
               balanceBefore: before,
               balanceAfter: after,
-              description: `Referral cashback (0.5%) from ${user.username ?? "referred user"}`,
+              description: `Referral cashback (0.5%) from ${user.username ?? "referred user"}'s first order`,
               referenceNumber: `REF-${Date.now()}-${Math.floor(Math.random() * 1000)}`
             }
+          });
+          // Mark that the referrer has been rewarded for this user's first order
+          await tx.user.update({
+            where: { id: order.userId },
+            data: { referralRewardedAt: new Date() }
           });
         }
       }
