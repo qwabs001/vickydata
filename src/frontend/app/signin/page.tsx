@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { Metadata } from "next";
 
 export default function SignInPage() {
   const router = useRouter();
