@@ -1,15 +1,15 @@
-# Fix Database 500 Errors on ghbundle.com
+# Fix Database 500 Errors on keldatagh.com
 
 If you see "Circuit breaker open" or 500 errors on all API routes, fix `DATABASE_URL` in Vercel.
 
 ## Step 1: Get connection string from Supabase
 
 1. Go to https://supabase.com/dashboard
-2. Select your project (GhBundle)
+2. Select your project (Keldatagh - yezeyzqalpiefanrosws)
 3. **Project Settings** (gear) → **Database**
 4. Under **Connection string**, select **URI**
-5. Choose **Transaction** mode
-6. **Copy** the connection string (it uses `pooler.supabase.com` and port **6543**)
+5. Choose **Session** mode (or Transaction mode)
+6. **Copy** the connection string (it uses `pooler.supabase.com` and port **5432**)
 7. Replace `[YOUR-PASSWORD]` with your **actual database password**
 
 ## Step 2: Add params to the URL
@@ -22,7 +22,7 @@ At the end of the URL, add (use `&` if there is already a `?`):
 
 Example result:
 ```
-postgresql://postgres.ryxxamwxeskfvojltfdt:YourPassword@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require&connection_limit=1
+postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
 ```
 
 ## Step 3: Reset password (if unsure)
@@ -45,11 +45,11 @@ postgresql://postgres.ryxxamwxeskfvojltfdt:YourPassword@aws-1-eu-west-1.pooler.s
 1. **Deployments** tab
 2. Click **...** on latest deployment → **Redeploy**
 3. Wait 2–3 minutes
-4. Try https://ghbundle.com again
+4. Try https://keldatagh.com again
 
 ## Verify
 
-Visit: https://ghbundle.com/api/health
+Visit: https://keldatagh.com/api/health
 
 - `{"ok":true,"database":"connected"}` = fixed
 - `{"ok":false,"database":"disconnected"}` = still broken, recheck password and URL

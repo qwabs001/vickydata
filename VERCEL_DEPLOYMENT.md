@@ -36,9 +36,9 @@ Go to **Settings** → **Environment Variables** and add:
 
 ```env
 # Database - Supabase Session Pooler
-DATABASE_URL=postgresql://postgres.ryxxamwxeskfvojltfdt:ZUNEJz6gyFNaEHsA@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
+DATABASE_URL=postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
 
-DIRECT_DATABASE_URL=postgresql://postgres.ryxxamwxeskfvojltfdt:ZUNEJz6gyFNaEHsA@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
+DIRECT_DATABASE_URL=postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
 
 # NextAuth (REQUIRED - Generate a new secret)
 NEXTAUTH_SECRET=<GENERATE_NEW_SECRET_BELOW>
