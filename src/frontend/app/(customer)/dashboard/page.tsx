@@ -193,7 +193,7 @@ export default function CustomerDashboardPage() {
     setWalletNotice(null);
     try {
       const ref = `WALLET-${user.id}-${Date.now()}`;
-      const res = await fetch("/api/payments/moolre/initialize", {
+      const res = await fetch("/api/payments/paystack/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -252,7 +252,7 @@ export default function CustomerDashboardPage() {
       const amount = Number(quickBuyPlan.price ?? 0);
       const currency = quickBuyPlan.currency ?? "GHS";
       const ref = `ORDER-${user.id}-${Date.now()}`;
-      const initRes = await fetch("/api/payments/moolre/initialize", {
+      const initRes = await fetch("/api/payments/paystack/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -773,7 +773,7 @@ export default function CustomerDashboardPage() {
               </div>
               <p className="mt-5 text-sm font-semibold text-slate-900">Processing payment...</p>
               <p className="mt-2 text-xs text-slate-500 text-center">
-                Opening the Moolre checkout page. Please wait.
+                Opening the Paystack checkout page. Please wait.
               </p>
             </div>
           ) : (
@@ -835,7 +835,7 @@ export default function CustomerDashboardPage() {
                   <path d="M12 8h.01" />
                 </svg>
                 <p className="text-xs text-blue-700">
-                  You will be redirected to Moolre to enter your mobile money number and approve the payment.
+                  You will be redirected to Paystack to complete the payment.
                 </p>
               </div>
 

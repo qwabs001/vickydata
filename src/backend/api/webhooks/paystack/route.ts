@@ -45,29 +45,94 @@ export async function POST(request: Request) {
     });
 
     if (paymentIntent) {
-      const metadata = paymentIntent.metadata as { type?: string } | null;
+      const metadata = paymentIntent.metadata as { type?: string; orderId?: string } | null;
       
+      // Update payment intent status
+      await prisma.paymentIntent.update({
+        where: { id: paymentIntent.id },
+        data: {
+          status: "CONFIRMED",
+          verifiedAt: new Date(),
+          rawVerify: JSON.parse(JSON.stringify(event.data || {}))
+        }
+      });
+
       // Handle agent upgrade
       if (metadata?.type === "agent_upgrade") {
         const user = paymentIntent.user;
         if (user && user.role !== "AGENT" && user.role !== "ADMIN") {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { role: "AGENT" }
+          });
+          console.log("[Paystack webhook] Agent upgrade processed:", user.id);
+        }
+        return NextResponse.json({ received: true });
+      }
+
+      // Handle wallet top-up
+      if (paymentIntent.type === "WALLET_TOPUP" && metadata?.type !== "agent_upgrade") {
+        const user = paymentIntent.user;
+        if (user) {
           await prisma.$transaction(async (tx) => {
-            await tx.paymentIntent.update({
-              where: { id: paymentIntent.id },
-              data: {
-                status: "CONFIRMED",
-                verifiedAt: new Date(),
-                rawVerify: JSON.parse(JSON.stringify(event.data || {}))
+            const wallet = await tx.walletBalance.findUnique({
+              where: { userId: user.id }
+            });
+            const before = wallet?.currentBalance ?? 0;
+            const after = Math.round((before + paymentIntent.amount) * 100) / 100;
+
+            await tx.walletBalance.upsert({
+              where: { userId: user.id },
+              create: {
+                userId: user.id,
+                totalAdded: paymentIntent.amount,
+                totalSpent: 0,
+                currentBalance: after
+              },
+              update: {
+                totalAdded: { increment: paymentIntent.amount },
+                currentBalance: after
               }
             });
 
-            await tx.user.update({
-              where: { id: user.id },
-              data: { role: "AGENT" }
+            await tx.walletTransaction.create({
+              data: {
+                userId: user.id,
+                type: "ADDED",
+                amount: paymentIntent.amount,
+                balanceBefore: before,
+                balanceAfter: after,
+                description: `Added via Paystack (${paymentIntent.reference})`,
+                referenceNumber: paymentIntent.reference
+              }
             });
           });
-          console.log("[Paystack webhook] Agent upgrade processed:", user.id);
-          return NextResponse.json({ received: true });
+          console.log("[Paystack webhook] Wallet top-up processed:", user.id, paymentIntent.amount);
+        }
+        return NextResponse.json({ received: true });
+      }
+
+      // Handle order payment via paymentIntent metadata
+      if (metadata?.orderId) {
+        const order = await prisma.order.findUnique({
+          where: { id: metadata.orderId }
+        });
+
+        if (order && order.status !== "COMPLETED") {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              paymentStatus: "COMPLETED",
+              paymentMethod: "CARD"
+            }
+          });
+
+          try {
+            await dataProviderService.fulfillOrder(order.id);
+            console.log("[Paystack webhook] Order fulfilled:", order.id);
+          } catch (err) {
+            console.error("Paystack webhook fulfillment error:", err);
+          }
         }
         return NextResponse.json({ received: true });
       }

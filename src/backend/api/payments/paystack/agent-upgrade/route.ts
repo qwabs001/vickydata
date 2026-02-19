@@ -60,7 +60,8 @@ export async function POST(request: Request) {
       orderNumber: ref,
       amount,
       email: user.fullName || user.username || `${user.phoneNumber}@keldatagh.com`,
-      callbackUrl
+      callbackUrl,
+      secretKey
     });
 
     // Store payment intent

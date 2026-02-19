@@ -334,7 +334,7 @@ const Theme5: React.FC = () => {
 
     try {
       const ref = `ORDER-${user.id}-${Date.now()}`;
-      const response = await fetch("/api/payments/moolre/initialize", {
+      const response = await fetch("/api/payments/paystack/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

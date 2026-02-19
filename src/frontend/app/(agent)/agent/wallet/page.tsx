@@ -376,7 +376,7 @@ export default function AgentWalletPage() {
             />
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            You will be redirected to Moolre to complete the payment.
+            You will be redirected to Paystack to complete the payment.
           </p>
           <button
             type="button"
@@ -391,7 +391,7 @@ export default function AgentWalletPage() {
               setWalletAddSubmitting(true);
               try {
                 const ref = `WALLET-${user.id}-${Date.now()}`;
-                const res = await fetch("/api/payments/moolre/initialize", {
+                const res = await fetch("/api/payments/paystack/initialize", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -421,7 +421,7 @@ export default function AgentWalletPage() {
             }}
             disabled={walletAddSubmitting}
           >
-            {walletAddSubmitting ? "Opening Moolre..." : "Add Funds"}
+            {walletAddSubmitting ? "Opening Paystack..." : "Add Funds"}
           </button>
         </div>
       </Dialog>
