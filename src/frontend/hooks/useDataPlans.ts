@@ -91,3 +91,33 @@ export function useDataPlans(networkId?: string | null, networkName?: string | n
 
   return { plans, loading };
 }
+
+/** Fetches all active data plans (for landing page package counts and plan list). */
+export function useAllDataPlans() {
+  const [plans, setPlans] = useState<DataPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    apiClient
+      .get<DataPlan[]>(`/data-plans?scope=public`)
+      .then((response) => {
+        if (!active) return;
+        setPlans(Array.isArray(response.data) ? response.data : []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setPlans([]);
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return { plans, loading };
+}

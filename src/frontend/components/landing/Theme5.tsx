@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useNetworks } from "@/frontend/hooks/useNetworks";
-import { useDataPlans } from "@/frontend/hooks/useDataPlans";
+import { useAllDataPlans } from "@/frontend/hooks/useDataPlans";
 import { useTheme } from "@/frontend/providers/ThemeProvider";
 import { useLandingConfig } from "@/frontend/providers/LandingConfigProvider";
 import { formatCurrency, formatGhanaPhone } from "@/shared/utils/formatters";
@@ -102,7 +102,7 @@ const Theme5: React.FC = () => {
     }) || null;
   }, [networks, selectedNetworkKey]);
 
-  const { plans } = useDataPlans(selectedNetwork?.id, selectedNetwork?.name);
+  const { plans, loading: plansLoading } = useAllDataPlans();
 
   const primaryColor = accent || primary || "#f5c63d";
   const brandName = "Keldatagh";
@@ -669,7 +669,12 @@ const Theme5: React.FC = () => {
               />
 
               <p className="mt-5 text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">Choose Data Package</p>
-              {filteredPlans.length > 0 ? (
+              {plansLoading ? (
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e5ddcf] bg-[#fbfaf8] px-4 py-4 text-sm text-[#746b5e]">
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                  Loading packages…
+                </div>
+              ) : filteredPlans.length > 0 ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {filteredPlans.map((plan) => {
                     const selected = selectedPlan?.id === plan.id;
