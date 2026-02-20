@@ -1388,12 +1388,82 @@ export const dataProviderService = {
     console.log("[fulfillOrder] API key present:", Boolean(config.apiKey), "| API secret present:", Boolean(config.apiSecret));
 
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
+    const isGhBundle = config.baseUrl.includes("ghbundle.com");
     // Default purchase path: /orders for ghbundle.com, /api/purchase for others
-    const purchasePath = endpoints.purchase ?? (config.baseUrl.includes("ghbundle.com") ? "/orders" : "/api/purchase");
+    const purchasePath = endpoints.purchase ?? (isGhBundle ? "/orders" : "/api/purchase");
     const purchaseMethod = endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
 
     let payload: object;
-    if (isV1Provider(config)) {
+    if (isGhBundle) {
+      // GhBundle API format: {service_id, phone, qty, client_order_id}
+      // Try to get service_id from externalOrder if available
+      let serviceId: string | null = null;
+      const externalOrder = await prisma.agentExternalOrder.findUnique({
+        where: { orderId: orderId },
+        select: { serviceId: true }
+      }).catch(() => null);
+      
+      if (externalOrder?.serviceId) {
+        serviceId = externalOrder.serviceId;
+      } else {
+        // Try to fetch service_id from GhBundle services API by matching plan
+        try {
+          const networkName = order.network?.name?.toUpperCase() ?? "";
+          const servicesPath = endpoints.networks ? endpoints.networks.replace("/networks", "/services") : "/services";
+          const servicesUrl = `${config.baseUrl}${servicesPath}?network=${networkName}`;
+          console.log("[fulfillOrder] Fetching services from:", servicesUrl);
+          
+          const servicesData = await apiRequest<{ data?: Array<{ service_id?: string; plan_name?: string; volume?: string }> }>(
+            config.baseUrl,
+            servicesPath + `?network=${networkName}`,
+            {
+              method: "GET",
+              apiKey: config.apiKey,
+              apiSecret: config.apiSecret ?? undefined
+            }
+          ).catch(() => null);
+          
+          const services = Array.isArray(servicesData) ? servicesData : (servicesData?.data ?? []);
+          const planName = order.dataPlan?.name ?? "";
+          const planVolume = order.dataPlan?.dataAmount ?? "";
+          
+          // Match by plan name or volume
+          const matchedService = services.find((s: { plan_name?: string; volume?: string; service_id?: string }) => 
+            s.service_id && (
+              s.plan_name?.toLowerCase() === planName.toLowerCase() ||
+              s.volume?.toLowerCase() === planVolume.toLowerCase()
+            )
+          ) as { service_id?: string } | undefined;
+          
+          if (matchedService?.service_id) {
+            serviceId = matchedService.service_id;
+            console.log("[fulfillOrder] Found service_id from GhBundle API:", serviceId);
+          }
+        } catch (lookupError) {
+          console.warn("[fulfillOrder] Failed to lookup service_id from GhBundle:", lookupError);
+        }
+      }
+      
+      // Fallback to dataPlanId if service_id not found (might work if GhBundle accepts it)
+      if (!serviceId) {
+        serviceId = order.dataPlanId;
+        console.warn("[fulfillOrder] Using dataPlanId as service_id (may not work):", serviceId);
+      }
+      
+      // Format phone number: ensure it starts with 233 (Ghana country code)
+      let phone = order.recipientNumber.trim();
+      if (!phone.startsWith("233")) {
+        phone = phone.startsWith("0") ? `233${phone.substring(1)}` : `233${phone}`;
+      }
+      
+      payload = {
+        service_id: serviceId,
+        phone,
+        qty: 1,
+        client_order_id: order.orderNumber
+      };
+      console.log("[fulfillOrder] GhBundle payload:", JSON.stringify(payload));
+    } else if (isV1Provider(config)) {
       const networkId = V1_NETWORKS.find((n) => n.name === (order.network?.name ?? ""))?.apiId ?? 9;
       payload = {
         beneficiary_number: order.recipientNumber,
