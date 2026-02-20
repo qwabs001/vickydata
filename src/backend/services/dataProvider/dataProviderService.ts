@@ -1130,7 +1130,8 @@ export const dataProviderService = {
     }
 
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
-    const isGhBundle = config.baseUrl.includes("ghbundle.com");
+    // Detect GhBundle API (direct or proxy URLs)
+    const isGhBundle = config.baseUrl.includes("ghbundle.com") || config.baseUrl.includes("ghbundle-reseller-api-proxy");
     // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
     const testPath = endpoints.test ?? (isGhBundle ? "/balance" : (isV1Provider(config) ? "/normal-orders" : "/"));
 
@@ -1391,7 +1392,8 @@ export const dataProviderService = {
     console.log("[fulfillOrder] API key present:", Boolean(config.apiKey), "| API secret present:", Boolean(config.apiSecret));
 
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
-    const isGhBundle = config.baseUrl.includes("ghbundle.com");
+    // Detect GhBundle API (direct or proxy URLs)
+    const isGhBundle = config.baseUrl.includes("ghbundle.com") || config.baseUrl.includes("ghbundle-reseller-api-proxy");
     // Default purchase path: /orders for ghbundle.com, /api/purchase for others
     const purchasePath = endpoints.purchase ?? (isGhBundle ? "/orders" : "/api/purchase");
     const purchaseMethod = endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
