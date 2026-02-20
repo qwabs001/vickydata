@@ -1,4 +1,5 @@
 import { prisma } from "@/backend/lib/db/prisma";
+import { toLocalGhanaPhone } from "@/backend/lib/utils/phoneFormatter";
 import { createHmac, randomBytes } from "crypto";
 import type { ApiConfiguration } from "@prisma/client";
 
@@ -2012,11 +2013,8 @@ export const dataProviderService = {
         console.warn("[fulfillOrder] Using dataPlanId as service_id (may not work):", serviceId);
       }
       
-      // Format phone number: ensure it starts with 233 (Ghana country code)
-      let phone = order.recipientNumber.trim();
-      if (!phone.startsWith("233")) {
-        phone = phone.startsWith("0") ? `233${phone.substring(1)}` : `233${phone}`;
-      }
+      // Provider recipient format: always local Ghana number starting with 0
+      const phone = toLocalGhanaPhone(order.recipientNumber);
       
       payload = {
         service_id: serviceId,
@@ -2032,7 +2030,7 @@ export const dataProviderService = {
         dataAmount: order.dataPlan?.dataAmount
       });
       const basePayload: V1PurchasePayload = {
-        beneficiary_number: order.recipientNumber,
+        beneficiary_number: toLocalGhanaPhone(order.recipientNumber),
         network_id: resolvedNetwork.apiId,
         size
       };
@@ -2054,7 +2052,7 @@ export const dataProviderService = {
       console.log("[fulfillOrder] V1 payload:", JSON.stringify(payload));
     } else {
       payload = {
-        recipientNumber: order.recipientNumber,
+        recipientNumber: toLocalGhanaPhone(order.recipientNumber),
         network: order.network?.name ?? "",
         networkId: order.networkId,
         planId: order.dataPlanId,

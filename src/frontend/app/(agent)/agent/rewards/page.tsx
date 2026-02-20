@@ -351,7 +351,7 @@ export default function RewardsPage() {
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black text-slate-900">Agent Rewards</h1>
-            <p className="text-sm text-slate-500">Track and manage your Keldatagh earnings</p>
+            <p className="text-sm text-slate-500">Track and manage your GhBundle earnings</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500 md:flex">

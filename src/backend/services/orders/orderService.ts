@@ -1,4 +1,5 @@
 import { prisma } from "@/backend/lib/db/prisma";
+import { toLocalGhanaPhone } from "@/backend/lib/utils/phoneFormatter";
 
 const generateOrderNumber = () => `GH-${Date.now()}`;
 
@@ -13,6 +14,7 @@ export const orderService = {
     rewardToUse?: number;
     useWallet?: boolean;
   }) {
+    const recipientNumber = toLocalGhanaPhone(payload.recipientNumber);
     return prisma.$transaction(async (tx) => {
       const existingOrders = await tx.order.count({
         where: { userId: payload.userId }
@@ -111,7 +113,7 @@ export const orderService = {
           userId: payload.userId,
           networkId: payload.networkId,
           dataPlanId: payload.dataPlanId,
-          recipientNumber: payload.recipientNumber,
+          recipientNumber,
           amount: netAmount,
           currency: payload.currency ?? "GHS",
           status: useWallet ? "PROCESSING" : "PENDING",

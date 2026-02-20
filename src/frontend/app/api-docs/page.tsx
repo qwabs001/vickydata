@@ -489,6 +489,81 @@ limit=10          (optional) Limit results`,
 }`
       }
     ]
+  },
+  {
+    id: "webhooks",
+    title: "Webhooks (API Clients)",
+    icon: "📩",
+    description: "Simple setup for external websites to receive live order status updates.",
+    endpoints: [
+      {
+        method: "POST",
+        path: "/api/v1/webhooks",
+        title: "Subscribe Webhook",
+        description:
+          "Create a webhook subscription. Use header X-API-KEY: YOUR_PUBLIC_KEY. Callback URL must be HTTPS.",
+        auth: true,
+        requestBody: `{
+  "url": "https://your-site.com/api/ghbundle/webhook",
+  "events": ["order.updated"],
+  "secret": "your_webhook_secret"
+}`,
+        responseBody: `{
+  "id": "wh_123",
+  "url": "https://your-site.com/api/ghbundle/webhook",
+  "events": ["order.updated"],
+  "enabled": true,
+  "created_at": "2026-02-20T12:00:00.000Z"
+}`
+      },
+      {
+        method: "GET",
+        path: "/api/v1/webhooks",
+        title: "List Webhooks",
+        description: "Get all active webhook subscriptions for the API key owner.",
+        auth: true,
+        responseBody: `{
+  "webhooks": [
+    {
+      "id": "wh_123",
+      "url": "https://your-site.com/api/ghbundle/webhook",
+      "events": ["order.updated"],
+      "enabled": true,
+      "created_at": "2026-02-20T12:00:00.000Z",
+      "updated_at": "2026-02-20T12:00:00.000Z"
+    }
+  ]
+}`
+      },
+      {
+        method: "DELETE",
+        path: "/api/v1/webhooks/:id",
+        title: "Delete Webhook",
+        description: "Delete a webhook subscription by ID.",
+        auth: true,
+        responseBody: `{
+  "ok": true
+}`
+      },
+      {
+        method: "POST",
+        path: "Webhook callback payload",
+        title: "What Your Site Receives",
+        description:
+          "Your callback endpoint receives this JSON plus headers: X-Webhook-Signature, X-Webhook-Event, X-Webhook-Id.",
+        auth: false,
+        responseBody: `{
+  "event": "order.updated",
+  "order_id": "ord_123",
+  "client_order_id": "client_456",
+  "status": "success",
+  "amount": 4.2,
+  "currency": "GHS",
+  "timestamp": "2026-02-20T12:00:00.000Z",
+  "signature": "hmac_signature_here"
+}`
+      }
+    ]
   }
 ];
 
@@ -657,8 +732,9 @@ export default function ApiDocsPage() {
             <div>
               <h3 className="text-sm font-bold text-slate-900">Authentication</h3>
               <p className="mt-2 text-sm text-slate-500">
-                Authenticated endpoints require a <code className="rounded bg-slate-100 px-1 text-xs">userId</code> passed via
-                header or query parameter. Endpoints marked with
+                App endpoints use <code className="rounded bg-slate-100 px-1 text-xs">x-user-id</code>. External API endpoints
+                under <code className="rounded bg-slate-100 px-1 text-xs">/api/v1</code> use
+                <code className="ml-1 rounded bg-slate-100 px-1 text-xs">X-API-KEY</code>. Endpoints marked with
                 <span className="mx-1 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-orange-600">Auth</span>
                 require authentication.
               </p>
@@ -668,7 +744,8 @@ export default function ApiDocsPage() {
             <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Request Headers</h4>
             <pre className="mt-2 text-[13px] text-slate-600">{`Content-Type: application/json
 Accept: application/json
-x-user-id: YOUR_USER_ID`}</pre>
+x-user-id: YOUR_USER_ID
+X-API-KEY: YOUR_PUBLIC_KEY`}</pre>
           </div>
         </div>
 

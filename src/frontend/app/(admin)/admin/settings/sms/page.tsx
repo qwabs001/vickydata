@@ -12,7 +12,7 @@ export default function Page() {
     africastalking: { username: "", apiKey: "", sandbox: true },
     termii: { apiKey: "", senderId: "" },
     orderCompleteTemplate: "Your order {{orderNumber}} is complete. {{planName}} has been delivered to {{recipient}}.",
-    walletTopUpTemplate: "Your Keldatagh wallet has been credited with GHS {{amount}}. New balance: GHS {{balance}}."
+    walletTopUpTemplate: "Your GhBundle wallet has been credited with GHS {{amount}}. New balance: GHS {{balance}}."
   });
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -234,7 +234,7 @@ export default function Page() {
             />
             <input
               className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
-              placeholder="Sender ID (e.g. Keldatagh)"
+              placeholder="Sender ID (e.g. GhBundle)"
               value={form.termii.senderId}
               onChange={(e) =>
                 setForm((p) => ({

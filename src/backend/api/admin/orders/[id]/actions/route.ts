@@ -2,8 +2,17 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/backend/lib/middleware/admin";
 import { prisma } from "@/backend/lib/db/prisma";
 import { dataProviderService } from "@/backend/services/dataProvider/dataProviderService";
+import { enqueueWebhookIfStatusChanged } from "@/backend/services/reseller/statusHooks";
 
 type ActionType = "resend" | "cancel" | "complete" | "cancel_refund" | "deduct_wallet";
+
+async function notifyResellerOrderStatusChange(orderId: string): Promise<void> {
+  try {
+    await enqueueWebhookIfStatusChanged(orderId);
+  } catch (error) {
+    console.error("[Admin actions] Reseller webhook enqueue error:", error);
+  }
+}
 
 async function refundToWallet(order: {
   id: string;
@@ -180,6 +189,7 @@ export async function POST(
       } catch (smsErr) {
         console.error("[Admin] Order complete SMS error:", smsErr);
       }
+      await notifyResellerOrderStatusChange(id);
       return NextResponse.json({ ok: true });
     }
 
@@ -233,6 +243,7 @@ export async function POST(
           }
         });
       });
+      await notifyResellerOrderStatusChange(id);
       return NextResponse.json({ ok: true, message: "Wallet deducted and order updated." });
     }
 
@@ -263,6 +274,7 @@ export async function POST(
         }
       });
 
+      await notifyResellerOrderStatusChange(id);
       return NextResponse.json({ ok: true });
     }
 
@@ -275,6 +287,7 @@ export async function POST(
         processedBy: adminId ?? null
       }
     });
+    await notifyResellerOrderStatusChange(id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Order action error:", error);
