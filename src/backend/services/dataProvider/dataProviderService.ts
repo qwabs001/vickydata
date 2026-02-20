@@ -1152,8 +1152,19 @@ export const dataProviderService = {
       const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
       // Detect GhBundle API (direct or proxy URLs)
       const isGhBundle = config.baseUrl.includes("ghbundle.com") || config.baseUrl.includes("ghbundle-reseller-api-proxy");
+      
+      // For GhBundle, try /balance first, then /services as fallback
       // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
-      const testPath = endpoints.test ?? (isGhBundle ? "/balance" : (isV1Provider(config) ? "/normal-orders" : "/"));
+      let testPath = endpoints.test;
+      if (!testPath) {
+        if (isGhBundle) {
+          testPath = "/balance";
+        } else if (isV1Provider(config)) {
+          testPath = "/normal-orders";
+        } else {
+          testPath = "/";
+        }
+      }
 
       const fullUrl = getUrl(config.baseUrl, testPath);
       console.log("[testConnection] Testing:", { 
@@ -1165,13 +1176,40 @@ export const dataProviderService = {
         customTestEndpoint: Boolean(endpoints.test)
       });
 
-      const result = await apiRequest(config.baseUrl, testPath, {
-        method: "GET",
-        apiKey: config.apiKey,
-        apiSecret: config.apiSecret ?? undefined
-      });
-      console.log("[testConnection] Success - response:", typeof result === "object" ? JSON.stringify(result).slice(0, 200) : "ok");
-      return { ok: true, message: "Connection successful." };
+      try {
+        const result = await apiRequest(config.baseUrl, testPath, {
+          method: "GET",
+          apiKey: config.apiKey,
+          apiSecret: config.apiSecret ?? undefined
+        });
+        console.log("[testConnection] Success - response:", typeof result === "object" ? JSON.stringify(result).slice(0, 200) : "ok");
+        return { ok: true, message: "Connection successful." };
+      } catch (firstError) {
+        // For GhBundle, if /balance fails with 404, try /services as fallback
+        if (isGhBundle && !endpoints.test && testPath === "/balance") {
+          const status = (firstError as { status?: number })?.status;
+          const errBody = (firstError as { body?: string })?.body || "";
+          const isHtmlError = errBody.trim().startsWith("<!DOCTYPE") || errBody.trim().startsWith("<!doctype") || errBody.trim().startsWith("<html");
+          
+          if (status === 404 && isHtmlError) {
+            console.log("[testConnection] /balance returned 404 HTML, trying /services as fallback");
+            try {
+              const fallbackResult = await apiRequest(config.baseUrl, "/services", {
+                method: "GET",
+                apiKey: config.apiKey,
+                apiSecret: config.apiSecret ?? undefined
+              });
+              console.log("[testConnection] Fallback /services success - response:", typeof fallbackResult === "object" ? JSON.stringify(fallbackResult).slice(0, 200) : "ok");
+              return { ok: true, message: "Connection successful (tested via /services endpoint)." };
+            } catch (fallbackError) {
+              // If fallback also fails, throw the original error
+              throw firstError;
+            }
+          }
+        }
+        // Re-throw if not a fallback case
+        throw firstError;
+      }
     } catch (err) {
       console.error("[testConnection] Error:", err);
       const status = (err as { status?: number })?.status;
@@ -1183,9 +1221,17 @@ export const dataProviderService = {
       }
       
       if (status === 404 && isHtmlError) {
+        // 404 with HTML usually means wrong endpoint or authentication issue
+        const isGhBundleUrl = baseUrl.includes("ghbundle.com") || baseUrl.includes("ghbundle-reseller-api-proxy");
+        if (isGhBundleUrl) {
+          return { 
+            ok: false, 
+            message: `Endpoint not found (404). This usually means: 1) Your API key is invalid or missing, 2) The endpoint doesn't exist on this API version, or 3) Authentication failed. Verify your API key in Settings > API Configuration and ensure it matches your GhBundle account.` 
+          };
+        }
         return { 
           ok: false, 
-          message: `Endpoint not found (404). The test endpoint does not exist on your API. For GhBundle APIs, use base URL: https://ghbundle.com/api/v1. If using a different provider, configure a custom test endpoint in Settings > API Configuration.` 
+          message: `Endpoint not found (404). The test endpoint "${path}" does not exist on "${baseUrl}". Check your base URL and endpoint configuration. If using GhBundle, use base URL: https://ghbundle.com/api/v1.` 
         };
       }
       
