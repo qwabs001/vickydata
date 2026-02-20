@@ -537,7 +537,7 @@ export default function Page() {
                   <input
                     value={contact.email}
                     onChange={(e) => setContact((prev) => ({ ...prev, email: e.target.value }))}
-                    placeholder="support@keldatagh.com"
+                    placeholder="support@ghbundle.com"
                     className="mt-2 w-full rounded-xl border border-slate-200 bg-[#f8fafc] px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
                   />
                 </div>

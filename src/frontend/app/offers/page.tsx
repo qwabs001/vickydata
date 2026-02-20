@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Offers",
-  description: "Discover the best data bundle offers in Ghana. Save more with Keldatagh.",
+  description: "Discover the best data bundle offers in Ghana. Save more with GhBundle.",
   alternates: { canonical: "/offers" }
 };
 
@@ -12,7 +12,7 @@ export default function OffersPage() {
     <div className="min-h-screen bg-[#f6f8fb]">
       <div className="mx-auto max-w-5xl px-6 py-16">
         <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Keldatagh Offers</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">GhBundle Offers</p>
           <h1 className="mt-3 text-3xl font-black text-[#0f172a] md:text-4xl">
             Buy Cheap Data Bundles in Ghana
           </h1>

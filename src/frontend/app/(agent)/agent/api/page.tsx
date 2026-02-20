@@ -17,7 +17,7 @@ type AgentCredential = {
   createdAt: string;
 };
 
-const BASE_URL = "https://keldatagh.com/api/v1";
+const BASE_URL = "https://ghbundle.com/api/v1";
 
 export default function AgentApiPage() {
   const { user } = useAuth();
