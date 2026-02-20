@@ -9,7 +9,8 @@ const endpointsSchema = z.object({
   plans: z.string().optional(),
   purchase: z.string().optional(),
   test: z.string().optional(),
-  status: z.string().optional()
+  status: z.string().optional(),
+  purchaseMethod: z.enum(["GET", "POST"]).optional()
 }).optional();
 
 const updateSchema = z.object({

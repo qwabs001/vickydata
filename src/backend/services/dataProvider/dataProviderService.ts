@@ -8,6 +8,7 @@ type EndpointsConfig = {
   purchase?: string;
   test?: string;
   status?: string;
+  purchaseMethod?: "GET" | "POST"; // HTTP method for purchase endpoint
 };
 
 function parseApiKey(input?: string): { raw: string; token: string; authorization: string } {
@@ -1362,6 +1363,7 @@ export const dataProviderService = {
 
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
     const purchasePath = endpoints.purchase ?? "/api/purchase";
+    const purchaseMethod = endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
 
     let payload: object;
     if (isV1Provider(config)) {
@@ -1385,25 +1387,51 @@ export const dataProviderService = {
       console.log("[fulfillOrder] Generic payload:", JSON.stringify(payload));
     }
 
-    console.log("[fulfillOrder] Calling provider API:", config.baseUrl + purchasePath);
+    console.log("[fulfillOrder] Calling provider API:", config.baseUrl + purchasePath, "Method:", purchaseMethod);
 
     try {
-      const result = await apiRequest<{
+      let result: {
         message?: string;
         order?: { reference_id?: number; total?: string; status?: string };
         reference?: string;
         transactionId?: string;
         success?: boolean;
-      }>(
-        config.baseUrl,
-        purchasePath,
-        {
-          method: "POST",
-          apiKey: config.apiKey,
-          apiSecret: config.apiSecret ?? undefined,
-          body: payload
+      };
+      
+      // Try the configured method first
+      try {
+        result = await apiRequest<typeof result>(
+          config.baseUrl,
+          purchasePath,
+          {
+            method: purchaseMethod,
+            apiKey: config.apiKey,
+            apiSecret: config.apiSecret ?? undefined,
+            body: purchaseMethod === "POST" ? payload : undefined // Only send body for POST
+          }
+        );
+      } catch (firstError: unknown) {
+        // If POST returns 405, try GET as fallback
+        if (purchaseMethod === "POST" && (firstError as { status?: number })?.status === 405) {
+          console.log("[fulfillOrder] POST returned 405, trying GET with query params");
+          const queryParams = new URLSearchParams();
+          Object.entries(payload).forEach(([key, value]) => {
+            queryParams.append(key, String(value));
+          });
+          const pathWithQuery = `${purchasePath}${purchasePath.includes("?") ? "&" : "?"}${queryParams.toString()}`;
+          result = await apiRequest<typeof result>(
+            config.baseUrl,
+            pathWithQuery,
+            {
+              method: "GET",
+              apiKey: config.apiKey,
+              apiSecret: config.apiSecret ?? undefined
+            }
+          );
+        } else {
+          throw firstError;
         }
-      );
+      }
 
       console.log("[fulfillOrder] Provider API response:", JSON.stringify(result));
 
