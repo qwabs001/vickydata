@@ -145,12 +145,11 @@ export async function POST(
     const adminId = request.headers.get("x-user-id") ?? undefined;
 
     if (action === "resend") {
+      // Allow resending even if payment not completed (admin has funds in provider)
       if (order.status === "COMPLETED" && order.apiResponsePayload) {
         return NextResponse.json({ error: "Order already completed." }, { status: 400 });
       }
-      if (order.paymentStatus !== "COMPLETED" && order.paymentMethod !== "WALLET") {
-        return NextResponse.json({ error: "Payment not completed." }, { status: 400 });
-      }
+      // Remove payment status check - allow admin to resend regardless of payment status
       const result = await dataProviderService.fulfillOrder(order.id);
       if (result.ok) {
         return NextResponse.json({ ok: true, reference: result.reference });
