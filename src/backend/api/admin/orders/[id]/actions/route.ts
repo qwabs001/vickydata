@@ -280,7 +280,14 @@ export async function POST(
     console.error("Order action error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error("Order action error details:", { errorMessage, errorStack, action, orderId: id });
+    try {
+      const { id: errorOrderId } = await params;
+      const errorBody = await request.json().catch(() => ({}));
+      const errorAction = errorBody?.action;
+      console.error("Order action error details:", { errorMessage, errorStack, action: errorAction, orderId: errorOrderId });
+    } catch {
+      console.error("Order action error details:", { errorMessage, errorStack });
+    }
     return NextResponse.json(
       { error: "Unable to process action.", details: process.env.NODE_ENV === "development" ? errorMessage : undefined },
       { status: 500 }
