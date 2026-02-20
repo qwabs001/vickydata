@@ -1388,7 +1388,8 @@ export const dataProviderService = {
     console.log("[fulfillOrder] API key present:", Boolean(config.apiKey), "| API secret present:", Boolean(config.apiSecret));
 
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
-    const purchasePath = endpoints.purchase ?? "/api/purchase";
+    // Default purchase path: /orders for ghbundle.com, /api/purchase for others
+    const purchasePath = endpoints.purchase ?? (config.baseUrl.includes("ghbundle.com") ? "/orders" : "/api/purchase");
     const purchaseMethod = endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
 
     let payload: object;
