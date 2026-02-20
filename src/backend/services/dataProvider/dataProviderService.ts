@@ -1121,21 +1121,28 @@ export const dataProviderService = {
   },
 
   async testConnection(configId?: string): Promise<{ ok: boolean; message: string }> {
-    const config = configId
-      ? await prisma.apiConfiguration.findUnique({ where: { id: configId } })
-      : await getActiveConfig();
-
-    if (!config) {
-      return { ok: false, message: "No API configuration found. Add one in Settings > API Configuration." };
-    }
-
-    const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
-    // Detect GhBundle API (direct or proxy URLs)
-    const isGhBundle = config.baseUrl.includes("ghbundle.com") || config.baseUrl.includes("ghbundle-reseller-api-proxy");
-    // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
-    const testPath = endpoints.test ?? (isGhBundle ? "/balance" : (isV1Provider(config) ? "/normal-orders" : "/"));
-
     try {
+      const config = configId
+        ? await prisma.apiConfiguration.findUnique({ where: { id: configId } })
+        : await getActiveConfig();
+
+      if (!config) {
+        return { ok: false, message: "No API configuration found. Add one in Settings > API Configuration." };
+      }
+
+      if (!config.apiKey || !config.apiKey.trim()) {
+        console.error("[testConnection] API key is missing or empty");
+        return { ok: false, message: "API key is missing. Please add your API key in Settings > API Configuration." };
+      }
+
+      const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
+      // Detect GhBundle API (direct or proxy URLs)
+      const isGhBundle = config.baseUrl.includes("ghbundle.com") || config.baseUrl.includes("ghbundle-reseller-api-proxy");
+      // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
+      const testPath = endpoints.test ?? (isGhBundle ? "/balance" : (isV1Provider(config) ? "/normal-orders" : "/"));
+
+      console.log("[testConnection] Testing:", { baseUrl: config.baseUrl, testPath, isGhBundle, hasApiKey: Boolean(config.apiKey) });
+
       const result = await apiRequest(config.baseUrl, testPath, {
         method: "GET",
         apiKey: config.apiKey,
@@ -1144,6 +1151,7 @@ export const dataProviderService = {
       console.log("[testConnection] Success - response:", typeof result === "object" ? JSON.stringify(result).slice(0, 200) : "ok");
       return { ok: true, message: "Connection successful." };
     } catch (err) {
+      console.error("[testConnection] Error:", err);
       const status = (err as { status?: number })?.status;
       if (status === 401 || status === 403) {
         return { ok: false, message: "Authentication failed. Check your API token." };
