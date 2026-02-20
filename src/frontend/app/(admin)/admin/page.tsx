@@ -21,6 +21,14 @@ const statusStyles: Record<string, string> = {
   Failed: "bg-[#fee2e2] text-[#ef4444]"
 };
 
+function isRevenueOrder(order: { status?: string; paymentStatus?: string }) {
+  return (
+    order.paymentStatus === "COMPLETED" &&
+    order.status !== "FAILED" &&
+    order.status !== "CANCELLED"
+  );
+}
+
 export default function Page() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
@@ -61,19 +69,19 @@ export default function Page() {
   }, [user?.id]);
 
   const metrics = useMemo(() => {
-    const completedOrders = orders.filter((o) => o.status === "COMPLETED");
-    const completedRevenue = completedOrders.reduce((sum, o) => sum + o.amount, 0);
+    const revenueOrders = orders.filter((o) => isRevenueOrder(o));
+    const totalRevenue = revenueOrders.reduce((sum, o) => sum + Number(o.amount ?? 0), 0);
     const activeOrders = orders.filter((o) => o.status === "PROCESSING" || o.status === "PENDING").length;
     const uniqueCustomers = users.length;
-    const rewardsLiability = completedRevenue * 0.01;
+    const rewardsLiability = totalRevenue * 0.01;
     const today = new Date().toDateString();
     const ordersToday = orders.filter((o) => new Date(o.createdAt).toDateString() === today).length;
 
     return [
       {
         label: "Total Revenue",
-        value: formatCurrency(completedRevenue, "GHS"),
-        trend: completedOrders.length > 0 ? `${completedOrders.length} orders` : "—",
+        value: formatCurrency(totalRevenue, "GHS"),
+        trend: revenueOrders.length > 0 ? `${revenueOrders.length} paid` : "—",
         accent: "bg-[#e7efff] text-[#2563eb]"
       },
       {
@@ -99,9 +107,9 @@ export default function Page() {
 
   const topNetworks = useMemo(() => {
     const totals: Record<string, number> = {};
-    orders.filter((o) => o.status === "COMPLETED").forEach((order) => {
+    orders.filter((o) => isRevenueOrder(o)).forEach((order) => {
       const label = order.network?.displayName ?? order.network?.name ?? "Unknown";
-      totals[label] = (totals[label] ?? 0) + order.amount;
+      totals[label] = (totals[label] ?? 0) + Number(order.amount ?? 0);
     });
     const totalAmount = Object.values(totals).reduce((sum, v) => sum + v, 0) || 1;
     const fromOrders = Object.entries(totals)
@@ -127,8 +135,8 @@ export default function Page() {
       const dateStr = d.toISOString().slice(0, 10);
       const dayLabel = d.toLocaleDateString("en-GB", { weekday: "short" });
       const dayRevenue = orders
-        .filter((o) => o.status === "COMPLETED" && o.createdAt?.slice(0, 10) === dateStr)
-        .reduce((sum, o) => sum + o.amount, 0);
+        .filter((o) => isRevenueOrder(o) && o.createdAt?.slice(0, 10) === dateStr)
+        .reduce((sum, o) => sum + Number(o.amount ?? 0), 0);
       days.push({ label: dayLabel, value: dayRevenue, date: dateStr });
     }
     const maxVal = Math.max(...days.map((d) => d.value), 1);
