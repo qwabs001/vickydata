@@ -8,8 +8,8 @@ If you see "Circuit breaker open" or 500 errors on all API routes, fix `DATABASE
 2. Select your project (Keldatagh - yezeyzqalpiefanrosws)
 3. **Project Settings** (gear) → **Database**
 4. Under **Connection string**, select **URI**
-5. Choose **Session** mode (or Transaction mode)
-6. **Copy** the connection string (it uses `pooler.supabase.com` and port **5432**)
+5. Choose **Transaction** mode
+6. **Copy** the connection string (it uses `pooler.supabase.com` and port **6543**)
 7. Replace `[YOUR-PASSWORD]` with your **actual database password**
 
 ## Step 2: Add params to the URL
@@ -17,12 +17,12 @@ If you see "Circuit breaker open" or 500 errors on all API routes, fix `DATABASE
 At the end of the URL, add (use `&` if there is already a `?`):
 
 ```
-?sslmode=require&connection_limit=1
+?pgbouncer=true&connection_limit=1&sslmode=require
 ```
 
 Example result:
 ```
-postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
+postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
 ```
 
 ## Step 3: Reset password (if unsure)
@@ -37,7 +37,7 @@ postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pool
 1. Vercel Dashboard → your project
 2. **Settings** → **Environment Variables**
 3. Find `DATABASE_URL` → **Edit**
-4. Paste the full connection string (with `?connection_limit=1`)
+4. Paste the full connection string (with `?pgbouncer=true&connection_limit=1&sslmode=require`)
 5. **Save**
 
 ## Step 5: Redeploy

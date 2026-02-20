@@ -35,10 +35,10 @@ Go to **Settings** → **Environment Variables** and add:
 #### Required Variables
 
 ```env
-# Database - Supabase Session Pooler
-DATABASE_URL=postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
+# Database - Supabase Transaction Pooler (RECOMMENDED for Vercel)
+DATABASE_URL=postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
 
-DIRECT_DATABASE_URL=postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
+DIRECT_DATABASE_URL=postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
 
 # NextAuth (REQUIRED - Generate a new secret)
 NEXTAUTH_SECRET=<GENERATE_NEW_SECRET_BELOW>
@@ -95,8 +95,8 @@ After first deployment, run migrations:
 
 ```bash
 # Option 1: Using the migration script
-export DATABASE_URL="postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
-export DIRECT_DATABASE_URL="postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
+export DATABASE_URL="postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require"
+export DIRECT_DATABASE_URL="postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require"
 npx prisma migrate deploy
 ```
 
@@ -131,7 +131,7 @@ npx prisma migrate deploy
 
 ### Database Connection Errors
 
-1. Verify `DATABASE_URL` uses the session pooler (port 5432)
+1. Verify `DATABASE_URL` uses transaction pooler (port 6543) with `pgbouncer=true`
 2. Check Supabase dashboard for IP allowlist settings
 3. Ensure `sslmode=require` is in the connection string
 4. Verify database password is correct

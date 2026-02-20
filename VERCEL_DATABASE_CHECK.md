@@ -2,14 +2,15 @@
 
 ## Current Configuration
 
-Your local `.env.local` shows you're using the **correct pooler URL**:
+Use this **recommended** `DATABASE_URL` for Vercel:
 ```
-postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
+postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
 ```
 
 ✅ **This is correct** - it uses:
 - `pooler.supabase.com` (not `db.`)
-- Port `5432` (session mode)
+- Port `6543` (transaction mode)
+- `pgbouncer=true`
 - `connection_limit=1` (good for serverless)
 
 ## Action Required: Verify Vercel Environment Variables
@@ -24,7 +25,7 @@ The `MaxClientsInSessionMode` error means Vercel might be using a different `DAT
 4. Find `DATABASE_URL` and verify it matches:
 
 ```
-postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
+postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
 ```
 
 ### Step 2: If DATABASE_URL is Missing or Different
@@ -32,7 +33,7 @@ postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pool
 1. Click **Edit** on `DATABASE_URL` (or **Add** if missing)
 2. Set the value to:
    ```
-   postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
+   postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
    ```
 3. Make sure it's enabled for **Production**, **Preview**, and **Development**
 4. Click **Save**
@@ -45,15 +46,10 @@ After updating the environment variable:
 3. Click **Redeploy**
 4. Or push a new commit to trigger a redeploy
 
-## Alternative: Use Transaction Mode (Port 6543)
+## Why this fixes it
 
-If you still see `MaxClientsInSessionMode` errors, try **transaction mode** (port 6543) which is better for serverless:
-
-```
-postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
-```
-
-**Note:** Transaction mode requires `pgbouncer=true` parameter.
+`MaxClientsInSessionMode` means session pooling was used under serverless load.  
+Transaction mode (`6543` + `pgbouncer=true`) avoids this by reusing pooled connections per transaction.
 
 ## Verify It's Working
 
