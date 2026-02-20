@@ -63,8 +63,22 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("User list error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error("User list error details:", { errorMessage, errorStack });
+    const errorCode = (error as { code?: string })?.code;
+    
+    // Check for database connection errors
+    if (
+      errorMessage.includes("MaxClientsInSessionMode") ||
+      errorMessage.includes("connection") ||
+      errorMessage.includes("timeout") ||
+      errorCode === "P1001" ||
+      errorCode === "P1017"
+    ) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Unable to fetch users.", details: process.env.NODE_ENV === "development" ? errorMessage : undefined },
       { status: 500 }
