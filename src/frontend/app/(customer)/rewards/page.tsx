@@ -48,6 +48,7 @@ const formatTime = (value: string) => {
 };
 
 const MIN_WITHDRAWAL = 300;
+const PAGE_SIZE = 7;
 
 export default function RewardsPage() {
   const { balance, transactions, tier, withdrawFunds } = useRewards();
@@ -63,6 +64,7 @@ export default function RewardsPage() {
   const [referralError, setReferralError] = useState<string | null>(null);
   const [referralLoading, setReferralLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [rewardsPage, setRewardsPage] = useState(1);
 
   const filteredTransactions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -113,6 +115,19 @@ export default function RewardsPage() {
     }
     return base;
   }, [activeTab, filteredTransactions]);
+
+  const rewardsTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(displayedTransactions.length / PAGE_SIZE)),
+    [displayedTransactions.length]
+  );
+  const visibleRewardsTransactions = useMemo(() => {
+    const start = (rewardsPage - 1) * PAGE_SIZE;
+    return displayedTransactions.slice(start, start + PAGE_SIZE);
+  }, [displayedTransactions, rewardsPage]);
+
+  useEffect(() => {
+    setRewardsPage(1);
+  }, [activeTab]);
 
   const handleWithdraw = async () => {
     setActionError(null);
@@ -272,7 +287,7 @@ export default function RewardsPage() {
                   : "No transactions yet."}
               </div>
             ) : null}
-            {displayedTransactions.map((item) => {
+            {visibleRewardsTransactions.map((item) => {
               const isReferTab = activeTab === "refer";
               const username = item.referredUsername ?? (item.description?.match(/referral bonus from (.+)$/i)?.[1] ?? "—");
               const purchaseAmount = item.orderAmount ?? null;
@@ -547,7 +562,7 @@ export default function RewardsPage() {
                     </td>
                   </tr>
                 ) : null}
-                {displayedTransactions.map((item) => {
+                {visibleRewardsTransactions.map((item) => {
                   if (activeTab === "refer") {
                     const username = item.referredUsername ?? item.description?.match(/referral bonus from (.+)$/i)?.[1] ?? "—";
                     const purchaseAmount = item.orderAmount;
@@ -604,14 +619,38 @@ export default function RewardsPage() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
-            <span>Showing {displayedTransactions.length} of {transactions.length} transactions</span>
-            <div className="flex items-center gap-2">
-              <button className="h-8 w-8 rounded-full border border-slate-200 text-xs font-semibold text-slate-600">1</button>
-              <button className="h-8 w-8 rounded-full border border-slate-200 text-xs font-semibold text-slate-600">2</button>
-              <button className="h-8 w-8 rounded-full border border-slate-200 text-xs font-semibold text-slate-600">3</button>
+          {displayedTransactions.length > PAGE_SIZE ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-6 py-4">
+              <p className="text-sm text-slate-600">
+                Showing {(rewardsPage - 1) * PAGE_SIZE + 1}–{Math.min(rewardsPage * PAGE_SIZE, displayedTransactions.length)} of {displayedTransactions.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRewardsPage((p) => Math.max(1, p - 1))}
+                  disabled={rewardsPage <= 1}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-slate-600">
+                  Page {rewardsPage} of {rewardsTotalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRewardsPage((p) => Math.min(rewardsTotalPages, p + 1))}
+                  disabled={rewardsPage >= rewardsTotalPages}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
+              Showing {displayedTransactions.length} of {transactions.length} transactions
+            </div>
+          )}
         </section>
       </div>
 

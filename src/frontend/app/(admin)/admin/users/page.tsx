@@ -44,6 +44,7 @@ interface ReferredUser {
 }
 
 const statusFilters = ["All", "Active", "Suspended", "VIP"] as const;
+const PAGE_SIZE = 7;
 
 const statusOptions: UserStatus[] = ["Active", "Suspended", "VIP"];
 
@@ -95,6 +96,7 @@ export default function Page() {
   const [walletError, setWalletError] = useState<string | null>(null);
   const [walletSubmitting, setWalletSubmitting] = useState(false);
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
+  const [usersPage, setUsersPage] = useState(1);
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -172,6 +174,19 @@ export default function Page() {
       return matchesSearch && matchesStatus;
     });
   }, [search, statusFilter, users]);
+
+  const usersTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE)),
+    [filteredUsers.length]
+  );
+  const visibleUsers = useMemo(() => {
+    const start = (usersPage - 1) * PAGE_SIZE;
+    return filteredUsers.slice(start, start + PAGE_SIZE);
+  }, [filteredUsers, usersPage]);
+
+  useEffect(() => {
+    setUsersPage(1);
+  }, [search, statusFilter]);
 
   const openEdit = (user: UserRow) => {
     setEditForm({
@@ -480,7 +495,7 @@ export default function Page() {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
+                visibleUsers.map((user) => (
                   <tr key={user.id} className="border-t border-slate-100">
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
@@ -567,6 +582,34 @@ export default function Page() {
             </tbody>
           </table>
         </div>
+        {filteredUsers.length > PAGE_SIZE ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-[#f8fafc] px-4 py-3">
+            <p className="text-sm text-slate-600">
+              Showing {(usersPage - 1) * PAGE_SIZE + 1}–{Math.min(usersPage * PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                disabled={usersPage <= 1}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-slate-600">
+                Page {usersPage} of {usersTotalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setUsersPage((p) => Math.min(usersTotalPages, p + 1))}
+                disabled={usersPage >= usersTotalPages}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {showReferralsModal ? (

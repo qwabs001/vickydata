@@ -8,9 +8,11 @@ import { getBrandTheme, hexToRgbString } from "@/backend/lib/theme";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "900"] });
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://keldatagh.com";
+const DEFAULT_ICON = "/images/networks/keldatagh.png";
 
 export async function generateMetadata(): Promise<Metadata> {
   const theme = await getBrandTheme();
+  const iconUrl = theme.logoUrl || DEFAULT_ICON;
   return {
     metadataBase: new URL(SITE_URL),
     title: {
@@ -36,16 +38,19 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "Instant data bundle purchases in Ghana with fast delivery and secure payments.",
       url: SITE_URL,
       siteName: "Keldatagh",
-      images: theme.logoUrl ? [theme.logoUrl] : undefined,
+      images: [iconUrl],
       type: "website"
     },
     twitter: {
       card: "summary_large_image",
       title: "Keldatagh | Buy Cheap Data Bundles in Ghana",
       description: "Instant data bundle purchases in Ghana with fast delivery and secure payments.",
-      images: theme.logoUrl ? [theme.logoUrl] : undefined
+      images: [iconUrl]
     },
-    icons: theme.logoUrl ? { icon: theme.logoUrl, apple: theme.logoUrl } : undefined
+    icons: {
+      icon: iconUrl,
+      apple: iconUrl
+    }
   };
 }
 

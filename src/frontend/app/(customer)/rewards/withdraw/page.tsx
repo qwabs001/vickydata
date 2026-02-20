@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+const PAGE_SIZE = 7;
 import Link from "next/link";
 import { Dialog } from "@/frontend/components/ui/dialog";
 import { useWallet } from "@/frontend/hooks/useWallet";
@@ -26,6 +28,7 @@ export default function WalletPage() {
   const [walletAmount, setWalletAmount] = useState("");
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
   const [walletAddSubmitting, setWalletAddSubmitting] = useState(false);
+  const [walletPage, setWalletPage] = useState(1);
 
   const loadTransactions = useCallback(async () => {
     if (!user?.id) {
@@ -66,6 +69,15 @@ export default function WalletPage() {
       document.body.classList.remove("hide-mobile-nav");
     };
   }, [showWalletModal]);
+
+  const walletTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(transactions.length / PAGE_SIZE)),
+    [transactions.length]
+  );
+  const visibleWalletTransactions = useMemo(() => {
+    const start = (walletPage - 1) * PAGE_SIZE;
+    return transactions.slice(start, start + PAGE_SIZE);
+  }, [transactions, walletPage]);
 
   const summary = useMemo(() => {
     const totalAdded = transactions
@@ -291,7 +303,7 @@ export default function WalletPage() {
                     </td>
                   </tr>
                 ) : null}
-                {transactions.map((item) => {
+                {visibleWalletTransactions.map((item) => {
                   const isCredit = item.type === "ADDED";
                   const isAdmin = item.description?.startsWith("Admin ");
                   const label = item.type === "ADDED"
@@ -320,6 +332,34 @@ export default function WalletPage() {
               </tbody>
             </table>
           </div>
+          {transactions.length > PAGE_SIZE ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-6 py-4">
+              <p className="text-sm text-slate-600">
+                Showing {(walletPage - 1) * PAGE_SIZE + 1}–{Math.min(walletPage * PAGE_SIZE, transactions.length)} of {transactions.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWalletPage((p) => Math.max(1, p - 1))}
+                  disabled={walletPage <= 1}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-slate-600">
+                  Page {walletPage} of {walletTotalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setWalletPage((p) => Math.min(walletTotalPages, p + 1))}
+                  disabled={walletPage >= walletTotalPages}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
 

@@ -21,6 +21,7 @@ const statusMap: Record<string, string> = {
 };
 
 const dateRanges = ["Last 7 days", "Last 30 days", "This year"];
+const PAGE_SIZE = 7;
 
 export default function Page() {
   const { user } = useAuth();
@@ -36,6 +37,7 @@ export default function Page() {
   const [userOrdersModal, setUserOrdersModal] = useState<{ userId: string; username: string } | null>(null);
   const [userOrders, setUserOrders] = useState<any[]>([]);
   const [userOrdersLoading, setUserOrdersLoading] = useState(false);
+  const [ordersPage, setOrdersPage] = useState(1);
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -112,7 +114,17 @@ export default function Page() {
     });
   }, [search, statusFilter, networkFilter, dateRange, orders]);
 
-  const visibleOrders = useMemo(() => filteredOrders.slice(0, 8), [filteredOrders]);
+  const ordersTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE)),
+    [filteredOrders.length]
+  );
+  const visibleOrders = useMemo(() => {
+    const start = (ordersPage - 1) * PAGE_SIZE;
+    return filteredOrders.slice(start, start + PAGE_SIZE);
+  }, [filteredOrders, ordersPage]);
+  useEffect(() => {
+    setOrdersPage(1);
+  }, [search, statusFilter, networkFilter, dateRange]);
 
   const handleRefresh = () => {
     if (user?.id) {
@@ -340,7 +352,7 @@ export default function Page() {
                           </svg>
                         </button>
                         {menuOpenId === order.id ? (
-                          <div className="absolute right-0 top-10 z-10 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                          <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
                             <button
                               type="button"
                               className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
@@ -395,7 +407,7 @@ export default function Page() {
           )}
         </div>
 
-        <div className="mt-6 hidden overflow-hidden rounded-2xl border border-slate-100 md:block">
+        <div className="mt-6 hidden overflow-visible rounded-2xl border border-slate-100 md:block">
           <table className="w-full text-sm">
             <thead className="bg-[#f8fafc] text-xs uppercase text-slate-400">
               <tr>
@@ -455,8 +467,8 @@ export default function Page() {
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-4">
-                        <div className="relative inline-flex items-center">
+                      <td className="overflow-visible px-4 py-4">
+                        <div className="relative inline-flex items-center justify-end">
                           <button
                             type="button"
                             onClick={() => setMenuOpenId(menuOpenId === order.id ? null : order.id)}
@@ -470,7 +482,7 @@ export default function Page() {
                             </svg>
                           </button>
                           {menuOpenId === order.id ? (
-                            <div className="absolute right-0 top-10 z-10 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                            <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
                               <button
                                 type="button"
                                 className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
@@ -525,6 +537,34 @@ export default function Page() {
             </tbody>
           </table>
         </div>
+        {filteredOrders.length > PAGE_SIZE ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-[#f8fafc] px-4 py-3">
+            <p className="text-sm text-slate-600">
+              Showing {(ordersPage - 1) * PAGE_SIZE + 1}–{Math.min(ordersPage * PAGE_SIZE, filteredOrders.length)} of {filteredOrders.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
+                disabled={ordersPage <= 1}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-slate-600">
+                Page {ordersPage} of {ordersTotalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setOrdersPage((p) => Math.min(ordersTotalPages, p + 1))}
+                disabled={ordersPage >= ordersTotalPages}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {userOrdersModal ? (

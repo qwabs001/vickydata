@@ -19,6 +19,7 @@ import { downloadCsv } from "@/frontend/lib/exportCsv";
 import { isValidGhanaPhone } from "@/shared/utils/validators";
 
 
+const PAGE_SIZE = 7;
 const isProviderBalanceFailure = (reason?: string | null) =>
   Boolean(reason && reason.toLowerCase().includes("insufficient balance"));
 const getOrderDisplayStatus = (order: { status: string; failedReason?: string | null }) => {
@@ -55,6 +56,7 @@ export default function CustomerDashboardPage() {
   const [showAgentUpgradeModal, setShowAgentUpgradeModal] = useState(false);
   const [agentUpgradeError, setAgentUpgradeError] = useState<string | null>(null);
   const [agentUpgradeSubmitting, setAgentUpgradeSubmitting] = useState(false);
+  const [dashboardTxPage, setDashboardTxPage] = useState(1);
 
   const typeLabels: Record<string, string> = {
     EARNED: "Earned (Cashback)",
@@ -69,6 +71,15 @@ export default function CustomerDashboardPage() {
     if (type === "EXPIRED") return "bg-[#fee2e2] text-[#ef4444]";
     return "bg-[#ecfdf3] text-[#16a34a]";
   };
+
+  const dashboardTxTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(transactions.length / PAGE_SIZE)),
+    [transactions.length]
+  );
+  const visibleDashboardTransactions = useMemo(() => {
+    const start = (dashboardTxPage - 1) * PAGE_SIZE;
+    return transactions.slice(start, start + PAGE_SIZE);
+  }, [transactions, dashboardTxPage]);
 
   const formatDate = (value: string) => {
     const date = new Date(value);
@@ -1050,7 +1061,7 @@ export default function CustomerDashboardPage() {
                   </td>
                 </tr>
               ) : (
-                transactions.map((item) => {
+                visibleDashboardTransactions.map((item) => {
                   const label = typeLabels[item.type] ?? item.description;
                   const statusLabel =
                     item.type === "WITHDRAWN" ? "Processing" : item.type === "EXPIRED" ? "Expired" : "Completed";
@@ -1081,14 +1092,38 @@ export default function CustomerDashboardPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
-          <span>Showing 1-4 of 128 transactions</span>
-          <div className="flex items-center gap-2">
-            <button className="h-8 w-8 rounded-full border border-slate-200 text-xs font-semibold text-slate-600">1</button>
-            <button className="h-8 w-8 rounded-full border border-slate-200 text-xs font-semibold text-slate-600">2</button>
-            <button className="h-8 w-8 rounded-full border border-slate-200 text-xs font-semibold text-slate-600">3</button>
+        {transactions.length > PAGE_SIZE ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-6 py-4">
+            <p className="text-sm text-slate-600">
+              Showing {(dashboardTxPage - 1) * PAGE_SIZE + 1}–{Math.min(dashboardTxPage * PAGE_SIZE, transactions.length)} of {transactions.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDashboardTxPage((p) => Math.max(1, p - 1))}
+                disabled={dashboardTxPage <= 1}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-slate-600">
+                Page {dashboardTxPage} of {dashboardTxTotalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setDashboardTxPage((p) => Math.min(dashboardTxTotalPages, p + 1))}
+                disabled={dashboardTxPage >= dashboardTxTotalPages}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
+            Showing {transactions.length} of {transactions.length} transactions
+          </div>
+        )}
       </section>
     </div>
   );

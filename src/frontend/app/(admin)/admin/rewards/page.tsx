@@ -7,6 +7,7 @@ import { useAuth } from "@/frontend/hooks/useAuth";
 import { downloadCsv } from "@/frontend/lib/exportCsv";
 
 const statusFilters = ["All", "Completed", "Processing"] as const;
+const PAGE_SIZE = 7;
 
 export default function Page() {
   const { user } = useAuth();
@@ -24,6 +25,7 @@ export default function Page() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transactionsPage, setTransactionsPage] = useState(1);
 
   useEffect(() => {
     const loadRewards = async () => {
@@ -77,6 +79,15 @@ export default function Page() {
       return matchesSearch && matchesStatus;
     });
   }, [search, statusFilter, transactions]);
+
+  const transactionsTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE)),
+    [filteredTransactions.length]
+  );
+  const visibleTransactions = useMemo(() => {
+    const start = (transactionsPage - 1) * PAGE_SIZE;
+    return filteredTransactions.slice(start, start + PAGE_SIZE);
+  }, [filteredTransactions, transactionsPage]);
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
@@ -236,7 +247,7 @@ export default function Page() {
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((row) => (
+                visibleTransactions.map((row) => (
                   <tr key={row.date + row.user} className="border-t border-slate-100">
                     <td className="px-4 py-3 text-slate-600">{new Date(row.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
                     <td className="px-4 py-3 text-slate-700">
@@ -276,6 +287,34 @@ export default function Page() {
             </tbody>
           </table>
         </div>
+        {filteredTransactions.length > PAGE_SIZE ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-[#f8fafc] px-4 py-3">
+            <p className="text-sm text-slate-600">
+              Showing {(transactionsPage - 1) * PAGE_SIZE + 1}–{Math.min(transactionsPage * PAGE_SIZE, filteredTransactions.length)} of {filteredTransactions.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTransactionsPage((p) => Math.max(1, p - 1))}
+                disabled={transactionsPage <= 1}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-slate-600">
+                Page {transactionsPage} of {transactionsTotalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setTransactionsPage((p) => Math.min(transactionsTotalPages, p + 1))}
+                disabled={transactionsPage >= transactionsTotalPages}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );

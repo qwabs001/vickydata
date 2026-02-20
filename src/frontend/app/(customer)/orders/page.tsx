@@ -63,7 +63,7 @@ const getStatusBadge = (label: string) =>
 export default function CustomerOrdersPage() {
   const { orders, loading, error, hasMore, loadingMore, loadMore } = useOrders({
     paginated: true,
-    pageSize: 20
+    pageSize: 7
   });
   const [search, setSearch] = useState("");
   const [networkFilter, setNetworkFilter] = useState("All Networks");
