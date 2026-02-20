@@ -279,11 +279,13 @@ export default function Page() {
       if (!res.ok) {
         throw new Error(data?.error ?? "Failed to save logo URL.");
       }
-      setLogoPreview(url);
-      setLogoUrl(url);
+      const savedUrl = (data.logoUrl ?? url).trim();
+      setLogoPreview(savedUrl);
+      setLogoUrl(savedUrl);
+      setLogoUrlInput(savedUrl);
       setLogoFile(null);
       setLogoName("");
-      saveThemeSettings({ logoUrl: url });
+      saveThemeSettings({ logoUrl: savedUrl });
       setLogoNotice("Logo URL saved. It will appear across the site.");
       localStorage.setItem("theme:refresh", Date.now().toString());
       window.dispatchEvent(new Event("theme:refresh"));
@@ -602,7 +604,7 @@ export default function Page() {
                 Or use a logo URL (no Cloudinary needed)
               </label>
               <p className="mt-1 text-xs text-slate-400">
-                Paste a direct link to your logo image (e.g. from your website or any image host).
+                Paste a direct image link (e.g. https://yoursite.com/logo.png). Imgbb page links (ibb.co/…) are auto-converted to the image.
               </p>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input

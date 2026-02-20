@@ -9,6 +9,29 @@ const logoSchema = z.object({
   logoUrl: z.string().min(1)
 });
 
+/** Resolve image-host page URLs (e.g. ibb.co) to the direct image URL. */
+async function resolveToDirectImageUrl(pageUrl: string): Promise<string | null> {
+  try {
+    const u = new URL(pageUrl);
+    const host = u.hostname.toLowerCase();
+    // Only resolve known page URLs; skip already-direct CDN hosts (e.g. i.ibb.co)
+    if (host !== "ibb.co" && host !== "imgbb.com") return null;
+    const res = await fetch(pageUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Keldatagh/1.0)" },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const ogImageMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    const direct = ogImageMatch?.[1]?.trim();
+    if (direct && (direct.startsWith("http://") || direct.startsWith("https://"))) return direct;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const auth = await requireAdmin(request);
@@ -37,8 +60,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Invalid logo payload." }, { status: 400 });
     }
 
+    let logoUrl = parsed.data.logoUrl.trim();
+    const resolved = await resolveToDirectImageUrl(logoUrl);
+    if (resolved) logoUrl = resolved;
+
     const userId = request.headers.get("x-user-id") ?? undefined;
-    const value = { logoUrl: parsed.data.logoUrl };
+    const value = { logoUrl };
 
     await prisma.settings.upsert({
       where: { key: SETTINGS_KEY },
