@@ -12,7 +12,9 @@ const DEFAULT_ICON = "/images/networks/keldatagh.png";
 
 export async function generateMetadata(): Promise<Metadata> {
   const theme = await getBrandTheme();
-  const iconUrl = theme.logoUrl || DEFAULT_ICON;
+  // Favicon always uses our default icon so it never breaks (theme logo can be external/broken).
+  const iconUrl = DEFAULT_ICON;
+  const ogImage = theme.logoUrl && theme.logoUrl.startsWith("http") ? theme.logoUrl : iconUrl;
   return {
     metadataBase: new URL(SITE_URL),
     title: {
@@ -38,14 +40,14 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "Instant data bundle purchases in Ghana with fast delivery and secure payments.",
       url: SITE_URL,
       siteName: "Keldatagh",
-      images: [iconUrl],
+      images: [ogImage],
       type: "website"
     },
     twitter: {
       card: "summary_large_image",
       title: "Keldatagh | Buy Cheap Data Bundles in Ghana",
       description: "Instant data bundle purchases in Ghana with fast delivery and secure payments.",
-      images: [iconUrl]
+      images: [ogImage]
     },
     icons: {
       icon: iconUrl,

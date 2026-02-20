@@ -93,9 +93,13 @@ const applyPrimary = (primary: string) => {
   document.documentElement.style.setProperty("--primary-rgb", `${r} ${g} ${b}`);
 };
 
+const DEFAULT_FAVICON = "/images/networks/keldatagh.png";
+
 const applyBrandIcon = (logoUrl?: string) => {
-  if (typeof document === "undefined" || !logoUrl) return;
+  if (typeof document === "undefined") return;
   const head = document.head;
+  // Use theme logo for favicon only when it's same-origin (reliable). Otherwise use default so tab icon never breaks.
+  const href = logoUrl?.startsWith("/") ? logoUrl : DEFAULT_FAVICON;
   const rels = ["icon", "apple-touch-icon"];
   rels.forEach((rel) => {
     let link = head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
@@ -104,7 +108,7 @@ const applyBrandIcon = (logoUrl?: string) => {
       link.rel = rel;
       head.appendChild(link);
     }
-    link.href = logoUrl;
+    link.href = href;
   });
 };
 
