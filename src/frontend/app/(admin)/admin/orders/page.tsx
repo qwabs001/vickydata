@@ -310,6 +310,10 @@ export default function Page() {
                   ) : null}
                   <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
                     <div>
+                      <p className="text-[10px] uppercase text-slate-400">Recipient&apos;s Number</p>
+                      <p className="font-semibold text-slate-700">{order.recipientNumber ?? "—"}</p>
+                    </div>
+                    <div>
                       <p className="text-[10px] uppercase text-slate-400">Network</p>
                       <p className="font-semibold text-slate-700">{order.network?.displayName ?? order.network?.name}</p>
                     </div>
@@ -397,6 +401,7 @@ export default function Page() {
               <tr>
                 <th className="px-4 py-4 text-left">Order ID</th>
                 <th className="px-4 py-4 text-left">Customer</th>
+                <th className="px-4 py-4 text-left">Recipient</th>
                 <th className="px-4 py-4 text-left">Network</th>
                 <th className="px-4 py-4 text-left">Plan</th>
                 <th className="px-4 py-4 text-left">Amount</th>
@@ -407,7 +412,7 @@ export default function Page() {
             <tbody>
               {visibleOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-500">
                     {loading ? "Loading orders..." : "No orders found."}
                   </td>
                 </tr>
@@ -434,6 +439,7 @@ export default function Page() {
                         )}
                         <div className="text-xs text-slate-400">{order.user?.phoneNumber}</div>
                       </td>
+                      <td className="px-4 py-4 text-slate-600">{order.recipientNumber ?? "—"}</td>
                       <td className="px-4 py-4 text-slate-600">{order.network?.displayName ?? order.network?.name}</td>
                       <td className="px-4 py-4 text-slate-600">{planLabel}</td>
                       <td className="px-4 py-4 text-slate-900 font-semibold">{order.currency} {order.amount.toFixed(2)}</td>
@@ -544,7 +550,9 @@ export default function Page() {
                       <li key={order.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3 text-sm">
                         <div>
                           <span className="font-semibold text-slate-800">{order.orderNumber}</span>
-                          <span className="ml-2 text-slate-500">{order.network?.displayName ?? order.network?.name}</span>
+                          <span className="ml-2 text-slate-500">{order.recipientNumber ?? "—"}</span>
+                          <span className="mx-2 text-slate-300">·</span>
+                          <span className="text-slate-500">{order.network?.displayName ?? order.network?.name}</span>
                           <span className="mx-2 text-slate-300">·</span>
                           <span className="text-slate-600">{planLabel}</span>
                         </div>
