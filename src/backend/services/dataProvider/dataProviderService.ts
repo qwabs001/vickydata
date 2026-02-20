@@ -1135,8 +1135,12 @@ export const dataProviderService = {
   },
 
   async testConnection(configId?: string): Promise<{ ok: boolean; message: string }> {
+    let config: ApiConfiguration | null = null;
+    let testPath = "/";
+    let baseUrl = "";
+    
     try {
-      const config = configId
+      config = configId
         ? await prisma.apiConfiguration.findUnique({ where: { id: configId } })
         : await getActiveConfig();
 
@@ -1149,13 +1153,14 @@ export const dataProviderService = {
         return { ok: false, message: "API key is missing. Please add your API key in Settings > API Configuration." };
       }
 
+      baseUrl = config.baseUrl;
       const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
       // Detect GhBundle API (direct or proxy URLs)
-      const isGhBundle = config.baseUrl.includes("ghbundle.com") || config.baseUrl.includes("ghbundle-reseller-api-proxy");
+      const isGhBundle = baseUrl.includes("ghbundle.com") || baseUrl.includes("ghbundle-reseller-api-proxy");
       
       // For GhBundle, try /balance first, then /services as fallback
       // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
-      let testPath = endpoints.test;
+      testPath = endpoints.test;
       if (!testPath) {
         if (isGhBundle) {
           testPath = "/balance";
@@ -1166,9 +1171,9 @@ export const dataProviderService = {
         }
       }
 
-      const fullUrl = getUrl(config.baseUrl, testPath);
+      const fullUrl = getUrl(baseUrl, testPath);
       console.log("[testConnection] Testing:", { 
-        baseUrl: config.baseUrl, 
+        baseUrl, 
         testPath, 
         fullUrl,
         isGhBundle, 
@@ -1177,7 +1182,7 @@ export const dataProviderService = {
       });
 
       try {
-        const result = await apiRequest(config.baseUrl, testPath, {
+        const result = await apiRequest(baseUrl, testPath, {
           method: "GET",
           apiKey: config.apiKey,
           apiSecret: config.apiSecret ?? undefined
@@ -1194,7 +1199,7 @@ export const dataProviderService = {
           if (status === 404 && isHtmlError) {
             console.log("[testConnection] /balance returned 404 HTML, trying /services as fallback");
             try {
-              const fallbackResult = await apiRequest(config.baseUrl, "/services", {
+              const fallbackResult = await apiRequest(baseUrl, "/services", {
                 method: "GET",
                 apiKey: config.apiKey,
                 apiSecret: config.apiSecret ?? undefined
@@ -1222,7 +1227,7 @@ export const dataProviderService = {
       
       if (status === 404 && isHtmlError) {
         // 404 with HTML usually means wrong endpoint or authentication issue
-        const isGhBundleUrl = baseUrl.includes("ghbundle.com") || baseUrl.includes("ghbundle-reseller-api-proxy");
+        const isGhBundleUrl = baseUrl && (baseUrl.includes("ghbundle.com") || baseUrl.includes("ghbundle-reseller-api-proxy"));
         if (isGhBundleUrl) {
           return { 
             ok: false, 
@@ -1231,7 +1236,7 @@ export const dataProviderService = {
         }
         return { 
           ok: false, 
-          message: `Endpoint not found (404). The test endpoint "${path}" does not exist on "${baseUrl}". Check your base URL and endpoint configuration. If using GhBundle, use base URL: https://ghbundle.com/api/v1.` 
+          message: `Endpoint not found (404). The test endpoint "${testPath}" does not exist on "${baseUrl || "your API"}". Check your base URL and endpoint configuration. If using GhBundle, use base URL: https://ghbundle.com/api/v1.` 
         };
       }
       
