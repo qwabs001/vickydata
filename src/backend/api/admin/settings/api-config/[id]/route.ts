@@ -89,12 +89,9 @@ export async function PATCH(
     if (parsed.data.name != null) updateData.name = parsed.data.name;
     if (parsed.data.apiKey != null) updateData.apiKey = parsed.data.apiKey;
     if (parsed.data.apiSecret !== undefined) {
-      updateData.apiSecret = parsed.data.apiSecret || null;
-    } else if (parsed.data.apiKey != null) {
-      // Default to API key when providers expect a signing secret but admin only supplies one token.
-      updateData.apiSecret = parsed.data.apiKey;
+      updateData.apiSecret = parsed.data.apiSecret.trim() || null;
     }
-    if (parsed.data.baseUrl != null) updateData.baseUrl = parsed.data.baseUrl;
+    if (parsed.data.baseUrl != null) updateData.baseUrl = parsed.data.baseUrl.replace(/\/+$/, "");
     if (parsed.data.endpoints !== undefined) updateData.endpoints = parsed.data.endpoints ?? {};
     if (parsed.data.isActive !== undefined) updateData.isActive = parsed.data.isActive;
 

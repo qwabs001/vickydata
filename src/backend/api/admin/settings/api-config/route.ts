@@ -97,7 +97,7 @@ export async function POST(request: Request) {
         provider: parsed.data.provider,
         name: parsed.data.name,
         apiKey: parsed.data.apiKey,
-        apiSecret: parsed.data.apiSecret ?? parsed.data.apiKey,
+        apiSecret: parsed.data.apiSecret?.trim() || null,
         baseUrl: parsed.data.baseUrl.replace(/\/+$/, ""),
         endpoints: (parsed.data.endpoints ?? {}) as object,
         networkId: null

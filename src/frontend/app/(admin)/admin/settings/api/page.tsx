@@ -18,6 +18,33 @@ type ServiceStatus = {
   latencyMs?: number;
 };
 
+function isGhBundleUrl(url: string): boolean {
+  return /ghbundle\.com|ghbundle-reseller-api-proxy/i.test(url);
+}
+
+function getProviderDefaults(baseUrl: string) {
+  if (isGhBundleUrl(baseUrl)) {
+    return {
+      provider: "ghbundle",
+      name: "GhBundle API",
+      endpoints: {
+        test: "/balance",
+        networks: "/services",
+        plans: "/services",
+        purchase: "/orders",
+        status: "/orders/{reference}",
+        purchaseMethod: "POST" as const
+      }
+    };
+  }
+
+  return {
+    provider: "v1",
+    name: "Data Provider API",
+    endpoints: { test: "/normal-orders", purchase: "/normal-orders", purchaseMethod: "POST" as const }
+  };
+}
+
 export default function Page() {
   const { user } = useAuth();
   const [configs, setConfigs] = useState<ApiConfig[]>([]);
@@ -29,7 +56,7 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
-  const [baseUrl, setBaseUrl] = useState("https://datafraternity.com/api/v1");
+  const [baseUrl, setBaseUrl] = useState("https://ghbundle.com/api/v1");
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
   const [showToken, setShowToken] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
@@ -69,6 +96,12 @@ export default function Page() {
     loadConfigs();
   }, [user?.id]);
 
+  useEffect(() => {
+    if (activeConfig?.baseUrl) {
+      setBaseUrl(activeConfig.baseUrl);
+    }
+  }, [activeConfig?.id, activeConfig?.baseUrl]);
+
   const showNotice = (msg: string) => {
     setNotice(msg);
     setError(null);
@@ -88,28 +121,34 @@ export default function Page() {
     try {
       new URL(resolvedBaseUrl);
     } catch {
-      setError("Enter a valid Base URL (e.g. https://datafraternity.com/api/v1).");
+      setError("Enter a valid Base URL (e.g. https://ghbundle.com/api/v1).");
       return;
     }
     setSaving(true);
     setError(null);
     try {
       const token = apiKey.trim();
-      const secret = apiSecret.trim() || token;
+      const secret = apiSecret.trim();
+      const defaults = getProviderDefaults(resolvedBaseUrl);
       const payload = {
-        provider: "v1",
-        name: "Data Provider API",
+        provider: defaults.provider,
+        name: defaults.name,
         apiKey: token,
         apiSecret: secret,
         baseUrl: resolvedBaseUrl,
-        endpoints: { test: "/normal-orders", purchase: "/normal-orders" }
+        endpoints: defaults.endpoints
       };
-      const existing = configs.find((c) => c.provider === "v1");
+      const existing =
+        configs.find((c) => c.provider === payload.provider) ??
+        configs.find((c) => c.isActive) ??
+        configs[0];
       const res = existing
         ? await fetch(`/api/admin/settings/api-config/${existing.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json", "x-user-id": user.id },
             body: JSON.stringify({
+              provider: payload.provider,
+              name: payload.name,
               apiKey: token,
               apiSecret: secret,
               baseUrl: resolvedBaseUrl,
@@ -320,7 +359,7 @@ export default function Page() {
               <input
                 type="url"
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-[#f8fafc] px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
-                placeholder="https://datafraternity.com/api/v1"
+                placeholder="https://ghbundle.com/api/v1"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
               />

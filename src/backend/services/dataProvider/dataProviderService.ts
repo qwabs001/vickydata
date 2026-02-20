@@ -42,8 +42,8 @@ function buildAuthHeaders(apiKey?: string, apiSecret?: string): Record<string, s
     headers["X-Auth-Token"] = parsedKey.token;
     headers["Api-Key"] = parsedKey.token;
   }
-  const secret = apiSecret?.trim() || parsedKey.token;
-  if (secret) {
+  const secret = apiSecret?.trim() ?? "";
+  if (secret && secret !== parsedKey.token) {
     headers["X-API-Secret"] = secret;
   }
   return headers;
@@ -57,8 +57,8 @@ function buildSignedHeaders(params: {
   apiSecret?: string;
 }): Record<string, string> {
   const parsedKey = parseApiKey(params.apiKey);
-  const secret = params.apiSecret?.trim() || parsedKey.token;
-  if (!secret) return {};
+  const secret = params.apiSecret?.trim() ?? "";
+  if (!secret || secret === parsedKey.token) return {};
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const nonce = randomBytes(12).toString("hex");
@@ -68,11 +68,8 @@ function buildSignedHeaders(params: {
 
   return {
     "X-TIMESTAMP": timestamp,
-    "X-Timestamp": timestamp,
     "X-NONCE": nonce,
-    "X-Nonce": nonce,
-    "X-SIGNATURE": signature,
-    "X-Signature": signature
+    "X-SIGNATURE": signature
   };
 }
 
@@ -87,6 +84,15 @@ function getUrl(baseUrl: string, path: string): string {
   const base = baseUrl.replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;
+}
+
+function getSignaturePath(baseUrl: string, path: string): string {
+  try {
+    const resolved = new URL(getUrl(baseUrl, path));
+    return `${resolved.pathname}${resolved.search}`;
+  } catch {
+    return path;
+  }
 }
 
 /** Parse provider API error into a clear, user-friendly failure reason. */
@@ -147,6 +153,7 @@ async function apiRequest<T>(
   } = {}
 ): Promise<T> {
   const url = getUrl(baseUrl, path);
+  const signaturePath = getSignaturePath(baseUrl, path);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json"
@@ -156,7 +163,7 @@ async function apiRequest<T>(
     headers,
     buildSignedHeaders({
       method: options.method ?? "GET",
-      path,
+      path: signaturePath,
       body: options.body,
       apiKey: options.apiKey,
       apiSecret: options.apiSecret
@@ -359,6 +366,37 @@ function isV1Provider(config: { provider: string; endpoints?: unknown }) {
   return config.provider === "v1" || (config.endpoints as Record<string, string> | null)?.purchase?.includes("normal-orders");
 }
 
+function isGhBundleBaseUrl(baseUrl: string): boolean {
+  const normalized = baseUrl.toLowerCase();
+  return normalized.includes("ghbundle.com") || normalized.includes("ghbundle-reseller-api-proxy");
+}
+
+function resolveGhBundleEndpoint(path: string | undefined, fallback: string): string {
+  const normalized = path?.trim() ?? "";
+  if (!normalized) return fallback;
+  const lower = normalized.toLowerCase();
+  if (
+    lower === "/" ||
+    lower === "/normal-orders" ||
+    lower === "/api/networks" ||
+    lower === "/api/plans" ||
+    lower === "/api/purchase"
+  ) {
+    return fallback;
+  }
+  return normalized;
+}
+
+type GhBundleService = {
+  service_id?: string;
+  network?: string;
+  plan_name?: string;
+  volume?: string;
+  price?: number;
+  validity?: string;
+  status?: string;
+};
+
 type ProviderOrderState = "COMPLETED" | "PROCESSING" | "FAILED" | "UNKNOWN";
 
 const PROVIDER_STATUS_KEYS = [
@@ -537,6 +575,10 @@ function extractProviderReference(payload: unknown): string | null {
     root.reference,
     root.reference_id,
     root.referenceId,
+    root.order_id,
+    root.orderId,
+    root.client_order_id,
+    root.clientOrderId,
     root.transactionId,
     root.transaction_id,
     root.externalref,
@@ -546,9 +588,17 @@ function extractProviderReference(payload: unknown): string | null {
     root.id,
     nestedOrder?.reference_id,
     nestedOrder?.reference,
+    nestedOrder?.order_id,
+    nestedOrder?.orderId,
+    nestedOrder?.client_order_id,
+    nestedOrder?.clientOrderId,
     nestedOrder?.id,
     nestedData?.reference,
     nestedData?.reference_id,
+    nestedData?.order_id,
+    nestedData?.orderId,
+    nestedData?.client_order_id,
+    nestedData?.clientOrderId,
     nestedData?.transactionid,
     nestedData?.transactionId,
     nestedData?.externalref
@@ -650,6 +700,86 @@ function planKey(network: string, plan: string) {
   return `${network}|${plan}`;
 }
 
+function parseDataAmountToMB(input: string): number {
+  const normalized = input.trim().toLowerCase();
+  const value = Number(normalized.replace(/[^0-9.]/g, ""));
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (normalized.includes("tb")) return Math.round(value * 1024 * 1024);
+  if (normalized.includes("gb")) return Math.round(value * 1024);
+  return Math.round(value);
+}
+
+function mapGhBundleServicesToPreviewNetworks(services: GhBundleService[]): PreviewNetwork[] {
+  const byNetwork = new Map<string, { displayName: string; plans: PreviewNetwork["plans"] }>();
+  for (const service of services) {
+    const network = (service.network ?? "").toString().trim();
+    const planName = (service.plan_name ?? service.volume ?? service.service_id ?? "").toString().trim();
+    const dataAmount = (service.volume ?? service.plan_name ?? planName).toString().trim();
+    const price = Number(service.price ?? 0);
+    if (!network || !planName || price <= 0) continue;
+    const validity = (service.validity ?? "30 days").toString();
+    const existing = byNetwork.get(network) ?? { displayName: network, plans: [] };
+    existing.plans.push({ name: planName, dataAmount, price, validity });
+    byNetwork.set(network, existing);
+  }
+
+  return Array.from(byNetwork.entries())
+    .map(([name, value]) => ({
+      name,
+      displayName: value.displayName,
+      plans: value.plans
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+async function fetchGhBundleServices(config: ApiConfiguration): Promise<GhBundleService[]> {
+  const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
+  const servicesPath = resolveGhBundleEndpoint(endpoints.networks, "/services");
+  const allServices: GhBundleService[] = [];
+
+  let page = 1;
+  let hasMore = true;
+  while (hasMore && page <= 100) {
+    const separator = servicesPath.includes("?") ? "&" : "?";
+    const path = `${servicesPath}${separator}page=${page}&limit=100`;
+    const payload = await apiRequest<
+      | { services?: GhBundleService[]; data?: GhBundleService[]; pagination?: { page?: number; limit?: number; total?: number; has_more?: boolean } }
+      | GhBundleService[]
+    >(config.baseUrl, path, {
+      method: "GET",
+      apiKey: config.apiKey,
+      apiSecret: config.apiSecret ?? undefined
+    });
+
+    const services = Array.isArray(payload)
+      ? payload
+      : payload.services ?? payload.data ?? [];
+    if (Array.isArray(services) && services.length > 0) {
+      allServices.push(...services);
+    }
+
+    if (Array.isArray(payload)) {
+      hasMore = services.length >= 100;
+    } else {
+      const pagination = payload.pagination;
+      if (pagination) {
+        const pageNum = Number(pagination.page ?? page);
+        const fallbackLimit = services.length > 0 ? services.length : 100;
+        const limit = Number(pagination.limit ?? fallbackLimit);
+        const total = Number(pagination.total ?? allServices.length);
+        const hasMoreFlag = Boolean(pagination.has_more);
+        hasMore = hasMoreFlag || pageNum * limit < total;
+      } else {
+        hasMore = services.length >= 100;
+      }
+    }
+
+    page++;
+  }
+
+  return allServices;
+}
+
 async function syncV1NetworksAndPlans(
   config: ApiConfiguration,
   options?: {
@@ -745,6 +875,145 @@ async function syncV1NetworksAndPlans(
   return { ok: true, networksAdded, plansAdded };
 }
 
+async function syncGhBundleNetworksAndPlans(
+  config: ApiConfiguration,
+  options?: {
+    markupPercent?: number;
+    networkMarkups?: Record<string, number>;
+    planMarkups?: Record<string, number>;
+    networksToImport?: string[];
+    servicesToImport?: Array<{ network: string; plan: string }>;
+    networkLogos?: Record<string, string>;
+  }
+): Promise<{ ok: boolean; networksAdded: number; plansAdded: number; error?: string }> {
+  const networkLogos = options?.networkLogos ?? {};
+  const networkMarkups = options?.networkMarkups ?? {};
+  const planMarkups = options?.planMarkups ?? {};
+  const markupPercent = options?.markupPercent ?? 0;
+  const networksToImport = options?.networksToImport;
+  const servicesToImport = options?.servicesToImport;
+
+  const applyMarkup = (basePrice: number, networkName: string, planName: string) => {
+    const planPct = planMarkups[planKey(networkName, planName)];
+    const netPct = networkMarkups[networkName];
+    const pct = planPct ?? netPct ?? markupPercent;
+    return Math.round(basePrice * (1 + pct / 100) * 100) / 100;
+  };
+
+  const allowedPlansByNetwork = new Map<string, Set<string>>();
+  if (servicesToImport && servicesToImport.length > 0) {
+    for (const service of servicesToImport) {
+      if (!allowedPlansByNetwork.has(service.network)) {
+        allowedPlansByNetwork.set(service.network, new Set());
+      }
+      allowedPlansByNetwork.get(service.network)!.add(service.plan);
+    }
+  }
+
+  let networksAdded = 0;
+  let plansAdded = 0;
+
+  try {
+    const services = await fetchGhBundleServices(config);
+    if (services.length === 0) {
+      return {
+        ok: true,
+        networksAdded: 0,
+        plansAdded: 0,
+        error: "No services returned from GhBundle."
+      };
+    }
+
+    const grouped = new Map<string, GhBundleService[]>();
+    for (const service of services) {
+      const networkName = (service.network ?? "").toString().trim();
+      if (!networkName) continue;
+      if (networksToImport && networksToImport.length > 0 && !networksToImport.includes(networkName)) {
+        continue;
+      }
+      if (!grouped.has(networkName)) grouped.set(networkName, []);
+      grouped.get(networkName)!.push(service);
+    }
+
+    let networkSort = 1;
+    for (const [networkName, networkServices] of grouped.entries()) {
+      if (allowedPlansByNetwork.size > 0 && !allowedPlansByNetwork.has(networkName)) {
+        continue;
+      }
+
+      const customLogo = networkLogos[networkName];
+      const logoUrl =
+        customLogo?.trim() ||
+        LOGO_MAP[networkName] ||
+        LOGO_MAP[networkName.toUpperCase()] ||
+        LOGO_MAP[networkName.toLowerCase()] ||
+        "/images/networks/MTN-Logo.png";
+
+      const network = await prisma.network.upsert({
+        where: { name: networkName },
+        create: {
+          name: networkName,
+          displayName: networkName,
+          logoUrl,
+          sortOrder: networkSort
+        },
+        update: {
+          displayName: networkName,
+          logoUrl,
+          sortOrder: networkSort
+        }
+      });
+      networksAdded++;
+      networkSort++;
+
+      const seenPlanNames = new Set<string>();
+      const allowedPlans = allowedPlansByNetwork.get(networkName);
+      let planSort = 1;
+      for (const service of networkServices) {
+        const planName = (service.plan_name ?? service.volume ?? service.service_id ?? "").toString().trim();
+        if (!planName) continue;
+        if (allowedPlans && !allowedPlans.has(planName)) continue;
+        if (seenPlanNames.has(planName)) continue;
+        seenPlanNames.add(planName);
+
+        const dataAmount = (service.volume ?? service.plan_name ?? planName).toString();
+        const basePrice = Number(service.price ?? 0);
+        if (basePrice <= 0) continue;
+        const price = applyMarkup(basePrice, networkName, planName);
+        const dataInMB = parseDataAmountToMB(dataAmount) || 1024;
+        const validity = (service.validity ?? "30 days").toString();
+
+        await prisma.dataPlan.upsert({
+          where: { networkId_name: { networkId: network.id, name: planName } },
+          create: {
+            networkId: network.id,
+            name: planName,
+            dataAmount,
+            dataInMB,
+            price,
+            validity,
+            sortOrder: planSort
+          },
+          update: {
+            dataAmount,
+            dataInMB,
+            price,
+            validity,
+            sortOrder: planSort
+          }
+        });
+        plansAdded++;
+        planSort++;
+      }
+    }
+
+    return { ok: true, networksAdded, plansAdded };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return { ok: false, networksAdded, plansAdded, error: msg };
+  }
+}
+
 async function fetchProviderOrderStatusPayload(
   config: ApiConfiguration,
   order: {
@@ -756,9 +1025,13 @@ async function fetchProviderOrderStatusPayload(
 ): Promise<unknown | null> {
   const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
   const providerReference = extractProviderReference(order.apiResponsePayload) ?? order.paymentReference;
+  const isGhBundle = isGhBundleBaseUrl(config.baseUrl);
 
   if (endpoints.status) {
-    const statusPath = buildStatusPath(endpoints.status, {
+    const statusTemplate = isGhBundle
+      ? resolveGhBundleEndpoint(endpoints.status, "/orders/{reference}")
+      : endpoints.status;
+    const statusPath = buildStatusPath(statusTemplate, {
       reference: providerReference,
       orderId: order.id,
       orderNumber: order.orderNumber
@@ -771,6 +1044,38 @@ async function fetchProviderOrderStatusPayload(
       });
     } catch (error) {
       console.warn("[provider status] Status endpoint failed:", statusPath, error);
+    }
+  }
+
+  if (isGhBundle) {
+    if (providerReference) {
+      const statusPath = `/orders/${encodeURIComponent(providerReference)}`;
+      try {
+        return await apiRequest<unknown>(config.baseUrl, statusPath, {
+          method: "GET",
+          apiKey: config.apiKey,
+          apiSecret: config.apiSecret ?? undefined
+        });
+      } catch (error) {
+        console.warn("[provider status] GhBundle order lookup failed:", statusPath, error);
+      }
+    }
+
+    try {
+      const listPath = "/orders?page=1&limit=50";
+      const listPayload = await apiRequest<unknown>(config.baseUrl, listPath, {
+        method: "GET",
+        apiKey: config.apiKey,
+        apiSecret: config.apiSecret ?? undefined
+      });
+      const matched = findProviderEntryByReference(listPayload, [
+        providerReference ?? "",
+        order.orderNumber,
+        order.id
+      ]);
+      if (matched) return matched;
+    } catch (error) {
+      console.warn("[provider status] GhBundle list fallback failed:", error);
     }
   }
 
@@ -1011,6 +1316,17 @@ export const dataProviderService = {
       };
     }
 
+    if (isGhBundleBaseUrl(config.baseUrl)) {
+      try {
+        const services = await fetchGhBundleServices(config);
+        const networks = mapGhBundleServicesToPreviewNetworks(services);
+        return { ok: true, networks };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        return { ok: false, networks: [], error: msg };
+      }
+    }
+
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
     const networksPath = endpoints.networks ?? "/api/networks";
     const plansPath = endpoints.plans ?? "/api/plans";
@@ -1156,15 +1472,15 @@ export const dataProviderService = {
       baseUrl = config.baseUrl;
       const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
       // Detect GhBundle API (direct or proxy URLs)
-      const isGhBundle = baseUrl.includes("ghbundle.com") || baseUrl.includes("ghbundle-reseller-api-proxy");
+      const isGhBundle = isGhBundleBaseUrl(baseUrl);
       
       // For GhBundle, try /balance first, then /services as fallback
       // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
       testPath = endpoints.test ?? "";
-      if (!testPath) {
-        if (isGhBundle) {
-          testPath = "/balance";
-        } else if (isV1Provider(config)) {
+      if (isGhBundle) {
+        testPath = resolveGhBundleEndpoint(testPath, "/balance");
+      } else if (!testPath) {
+        if (isV1Provider(config)) {
           testPath = "/normal-orders";
         } else {
           testPath = "/";
@@ -1191,7 +1507,7 @@ export const dataProviderService = {
         return { ok: true, message: "Connection successful." };
       } catch (firstError) {
         // For GhBundle, if /balance fails with 404, try /services as fallback
-        if (isGhBundle && !endpoints.test && testPath === "/balance") {
+        if (isGhBundle && testPath === "/balance") {
           const status = (firstError as { status?: number })?.status;
           const errBody = (firstError as { body?: string })?.body || "";
           const isHtmlError = errBody.trim().startsWith("<!DOCTYPE") || errBody.trim().startsWith("<!doctype") || errBody.trim().startsWith("<html");
@@ -1227,7 +1543,7 @@ export const dataProviderService = {
       
       if (status === 404 && isHtmlError) {
         // 404 with HTML usually means wrong endpoint or authentication issue
-        const isGhBundleUrl = baseUrl && (baseUrl.includes("ghbundle.com") || baseUrl.includes("ghbundle-reseller-api-proxy"));
+        const isGhBundleUrl = baseUrl && isGhBundleBaseUrl(baseUrl);
         if (isGhBundleUrl) {
           return { 
             ok: false, 
@@ -1272,6 +1588,10 @@ export const dataProviderService = {
         plansAdded: 0,
         error: "No API configuration found."
       };
+    }
+
+    if (isGhBundleBaseUrl(config.baseUrl)) {
+      return syncGhBundleNetworksAndPlans(config, options);
     }
 
     if (isV1Provider(config)) {
@@ -1485,9 +1805,11 @@ export const dataProviderService = {
 
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
     // Detect GhBundle API (direct or proxy URLs)
-    const isGhBundle = config.baseUrl.includes("ghbundle.com") || config.baseUrl.includes("ghbundle-reseller-api-proxy");
+    const isGhBundle = isGhBundleBaseUrl(config.baseUrl);
     // Default purchase path: /orders for ghbundle.com, /api/purchase for others
-    const purchasePath = endpoints.purchase ?? (isGhBundle ? "/orders" : "/api/purchase");
+    const purchasePath = isGhBundle
+      ? resolveGhBundleEndpoint(endpoints.purchase, "/orders")
+      : (endpoints.purchase ?? "/api/purchase");
     const purchaseMethod = endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
 
     let payload: object;
@@ -1506,14 +1828,12 @@ export const dataProviderService = {
         // Try to fetch service_id from GhBundle services API by matching plan
         try {
           const networkName = order.network?.name?.toUpperCase() ?? "";
-          const servicesPath = endpoints.networks?.includes("/networks") 
-            ? endpoints.networks.replace("/networks", "/services")
-            : (endpoints.networks ?? "/services");
+          const servicesPath = resolveGhBundleEndpoint(endpoints.networks, "/services");
           const queryParam = networkName ? `?network=${encodeURIComponent(networkName)}` : "";
           const fullServicesPath = `${servicesPath}${queryParam}`;
           console.log("[fulfillOrder] Fetching services from:", config.baseUrl + fullServicesPath);
           
-          const servicesData = await apiRequest<{ data?: Array<{ service_id?: string; plan_name?: string; volume?: string }> } | Array<{ service_id?: string; plan_name?: string; volume?: string }>>(
+          const servicesData = await apiRequest<{ services?: Array<{ service_id?: string; plan_name?: string; volume?: string }>; data?: Array<{ service_id?: string; plan_name?: string; volume?: string }> } | Array<{ service_id?: string; plan_name?: string; volume?: string }>>(
             config.baseUrl,
             fullServicesPath,
             {
@@ -1526,7 +1846,7 @@ export const dataProviderService = {
             return null;
           });
           
-          const services = Array.isArray(servicesData) ? servicesData : (servicesData?.data ?? []);
+          const services = Array.isArray(servicesData) ? servicesData : (servicesData?.services ?? servicesData?.data ?? []);
           const planName = order.dataPlan?.name ?? "";
           const planVolume = order.dataPlan?.dataAmount ?? "";
           
@@ -1636,6 +1956,7 @@ export const dataProviderService = {
       console.log("[fulfillOrder] Provider API response:", JSON.stringify(result));
 
       const reference =
+        extractProviderReference(result) ??
         result.order?.reference_id?.toString() ??
         result.reference ??
         result.transactionId ??
