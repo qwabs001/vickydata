@@ -150,11 +150,17 @@ export async function POST(
         return NextResponse.json({ error: "Order already completed." }, { status: 400 });
       }
       // Remove payment status check - allow admin to resend regardless of payment status
-      const result = await dataProviderService.fulfillOrder(order.id);
-      if (result.ok) {
-        return NextResponse.json({ ok: true, reference: result.reference });
+      try {
+        const result = await dataProviderService.fulfillOrder(order.id);
+        if (result.ok) {
+          return NextResponse.json({ ok: true, reference: result.reference });
+        }
+        return NextResponse.json({ error: result.error ?? "Fulfillment failed." }, { status: 400 });
+      } catch (fulfillError) {
+        console.error("[Admin actions] FulfillOrder error:", fulfillError);
+        const errorMsg = fulfillError instanceof Error ? fulfillError.message : "Fulfillment failed.";
+        return NextResponse.json({ error: errorMsg }, { status: 400 });
       }
-      return NextResponse.json({ error: result.error ?? "Fulfillment failed." }, { status: 400 });
     }
 
     if (action === "complete") {
@@ -272,6 +278,12 @@ export async function POST(
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Order action error:", error);
-    return NextResponse.json({ error: "Unable to process action." }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Order action error details:", { errorMessage, errorStack, action, orderId: id });
+    return NextResponse.json(
+      { error: "Unable to process action.", details: process.env.NODE_ENV === "development" ? errorMessage : undefined },
+      { status: 500 }
+    );
   }
 }

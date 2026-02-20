@@ -1409,19 +1409,25 @@ export const dataProviderService = {
         // Try to fetch service_id from GhBundle services API by matching plan
         try {
           const networkName = order.network?.name?.toUpperCase() ?? "";
-          const servicesPath = endpoints.networks ? endpoints.networks.replace("/networks", "/services") : "/services";
-          const servicesUrl = `${config.baseUrl}${servicesPath}?network=${networkName}`;
-          console.log("[fulfillOrder] Fetching services from:", servicesUrl);
+          const servicesPath = endpoints.networks?.includes("/networks") 
+            ? endpoints.networks.replace("/networks", "/services")
+            : (endpoints.networks ?? "/services");
+          const queryParam = networkName ? `?network=${encodeURIComponent(networkName)}` : "";
+          const fullServicesPath = `${servicesPath}${queryParam}`;
+          console.log("[fulfillOrder] Fetching services from:", config.baseUrl + fullServicesPath);
           
-          const servicesData = await apiRequest<{ data?: Array<{ service_id?: string; plan_name?: string; volume?: string }> }>(
+          const servicesData = await apiRequest<{ data?: Array<{ service_id?: string; plan_name?: string; volume?: string }> } | Array<{ service_id?: string; plan_name?: string; volume?: string }>>(
             config.baseUrl,
-            servicesPath + `?network=${networkName}`,
+            fullServicesPath,
             {
               method: "GET",
               apiKey: config.apiKey,
               apiSecret: config.apiSecret ?? undefined
             }
-          ).catch(() => null);
+          ).catch((err) => {
+            console.warn("[fulfillOrder] Services API lookup failed:", err);
+            return null;
+          });
           
           const services = Array.isArray(servicesData) ? servicesData : (servicesData?.data ?? []);
           const planName = order.dataPlan?.name ?? "";
