@@ -126,8 +126,8 @@ function parseProviderError(err: unknown): string {
   if (lower.includes("network") && (lower.includes("unavailable") || lower.includes("down"))) {
     return "Provider network temporarily unavailable. Please try again later.";
   }
-  if (status === 401 || lower.includes("unauthorized") || lower.includes("auth")) {
-    return "Provider API authentication failed. Check your API configuration.";
+  if (status === 401 || status === 403 || lower.includes("unauthorized") || lower.includes("forbidden") || (lower.includes("auth") && (lower.includes("fail") || lower.includes("invalid") || lower.includes("error")))) {
+    return "Provider API authentication failed. Check your API key, API secret, and base URL in Settings > API Configuration.";
   }
   if (status === 404 || lower.includes("not found")) {
     return "Plan or network not found on provider. Verify your plan catalog.";
@@ -163,6 +163,18 @@ async function apiRequest<T>(
     })
   );
 
+  // Log request details (without exposing sensitive values)
+  const logHeaders = { ...headers };
+  if (logHeaders.Authorization) logHeaders.Authorization = logHeaders.Authorization.substring(0, 20) + "...";
+  if (logHeaders["X-API-Key"]) logHeaders["X-API-Key"] = logHeaders["X-API-Key"].substring(0, 10) + "...";
+  console.log("[apiRequest] Request:", {
+    method: options.method ?? "GET",
+    url,
+    hasApiKey: Boolean(options.apiKey),
+    hasApiSecret: Boolean(options.apiSecret),
+    headerKeys: Object.keys(headers)
+  });
+
   const res = await fetch(url, {
     method: options.method ?? "GET",
     headers,
@@ -171,6 +183,13 @@ async function apiRequest<T>(
 
   if (!res.ok) {
     const text = await res.text();
+    console.error("[apiRequest] Provider API error:", {
+      status: res.status,
+      statusText: res.statusText,
+      url,
+      headers: Object.fromEntries(res.headers.entries()),
+      body: text.slice(0, 500)
+    });
     const err = new Error(`API error ${res.status}: ${text.slice(0, 500)}`) as Error & { status?: number; body?: string };
     err.status = res.status;
     err.body = text;
@@ -1359,7 +1378,14 @@ export const dataProviderService = {
       return { ok: false, error: "No API configuration. Configure in Settings > API Configuration." };
     }
 
+    // Validate API credentials
+    if (!config.apiKey || !config.apiKey.trim()) {
+      console.error("[fulfillOrder] API key is missing or empty");
+      return { ok: false, error: "API key is missing. Check your API configuration." };
+    }
+
     console.log("[fulfillOrder] Using config:", config.name, "| provider:", config.provider, "| baseUrl:", config.baseUrl);
+    console.log("[fulfillOrder] API key present:", Boolean(config.apiKey), "| API secret present:", Boolean(config.apiSecret));
 
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
     const purchasePath = endpoints.purchase ?? "/api/purchase";
