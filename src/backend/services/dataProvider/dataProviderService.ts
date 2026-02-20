@@ -1130,14 +1130,17 @@ export const dataProviderService = {
     }
 
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
-    const testPath = endpoints.test ?? (isV1Provider(config) ? "/normal-orders" : "/");
+    const isGhBundle = config.baseUrl.includes("ghbundle.com");
+    // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
+    const testPath = endpoints.test ?? (isGhBundle ? "/balance" : (isV1Provider(config) ? "/normal-orders" : "/"));
 
     try {
-      await apiRequest(config.baseUrl, testPath, {
+      const result = await apiRequest(config.baseUrl, testPath, {
         method: "GET",
         apiKey: config.apiKey,
         apiSecret: config.apiSecret ?? undefined
       });
+      console.log("[testConnection] Success - response:", typeof result === "object" ? JSON.stringify(result).slice(0, 200) : "ok");
       return { ok: true, message: "Connection successful." };
     } catch (err) {
       const status = (err as { status?: number })?.status;
