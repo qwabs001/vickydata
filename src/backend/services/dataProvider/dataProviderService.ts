@@ -1136,7 +1136,7 @@ export const dataProviderService = {
 
   async testConnection(configId?: string): Promise<{ ok: boolean; message: string }> {
     let config: ApiConfiguration | null = null;
-    let testPath = "/";
+    let testPath: string = "/";
     let baseUrl = "";
     
     try {
@@ -1160,7 +1160,7 @@ export const dataProviderService = {
       
       // For GhBundle, try /balance first, then /services as fallback
       // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
-      testPath = endpoints.test;
+      testPath = endpoints.test ?? "";
       if (!testPath) {
         if (isGhBundle) {
           testPath = "/balance";
