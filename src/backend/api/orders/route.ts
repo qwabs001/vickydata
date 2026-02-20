@@ -145,7 +145,14 @@ export async function GET(request: Request) {
     console.error("Order fetch error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error("Order fetch error details:", { errorMessage, errorStack, scope, userId });
+    try {
+      const { searchParams } = new URL(request.url);
+      const errorScope = searchParams.get("scope");
+      const errorUserId = searchParams.get("userId");
+      console.error("Order fetch error details:", { errorMessage, errorStack, scope: errorScope, userId: errorUserId });
+    } catch {
+      console.error("Order fetch error details:", { errorMessage, errorStack });
+    }
     return NextResponse.json(
       { error: "Unable to fetch orders.", details: process.env.NODE_ENV === "development" ? errorMessage : undefined },
       { status: 500 }
