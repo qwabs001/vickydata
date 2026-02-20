@@ -238,6 +238,7 @@ const V1_NETWORKS: Array<{ name: string; displayName: string; apiId: number }> =
 ];
 
 type PlanDef = { name: string; dataAmount: string; price: number; validity: string };
+type V1NetworkName = "MTN" | "TELECEL" | "ISHARE" | "BIGTIME";
 
 /* ── Per-network plan catalogs ──
    Comprehensive plan lists for each DataFraternity network.
@@ -707,6 +708,70 @@ function parseDataAmountToMB(input: string): number {
   if (normalized.includes("tb")) return Math.round(value * 1024 * 1024);
   if (normalized.includes("gb")) return Math.round(value * 1024);
   return Math.round(value);
+}
+
+function normalizeV1Key(value: string): string {
+  return value.replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
+
+function resolveV1Network(rawNetworkName?: string | null): { name: V1NetworkName; apiId: number } {
+  const normalized = normalizeV1Key(rawNetworkName ?? "");
+  const aliasMap: Record<string, V1NetworkName> = {
+    MTN: "MTN",
+    TELECEL: "TELECEL",
+    VODAFONE: "TELECEL",
+    ISHARE: "ISHARE",
+    BIGTIME: "BIGTIME",
+    AIRTELTIGO: "BIGTIME",
+    AIRTEL: "BIGTIME",
+    TIGO: "BIGTIME",
+    AT: "BIGTIME"
+  };
+
+  let resolvedName = aliasMap[normalized];
+  if (!resolvedName && normalized.includes("VODAFONE")) resolvedName = "TELECEL";
+  if (!resolvedName && normalized.includes("TELECEL")) resolvedName = "TELECEL";
+  if (!resolvedName && (normalized.includes("AIRTEL") || normalized.includes("TIGO") || normalized.includes("BIGTIME"))) {
+    resolvedName = "BIGTIME";
+  }
+  if (!resolvedName && normalized.includes("ISHARE")) resolvedName = "ISHARE";
+  if (!resolvedName && normalized.includes("MTN")) resolvedName = "MTN";
+
+  const finalName = resolvedName ?? "MTN";
+  const network = V1_NETWORKS.find((n) => n.name === finalName);
+  return {
+    name: finalName,
+    apiId: network?.apiId ?? 9
+  };
+}
+
+function resolveV1PlanSize(
+  networkName: V1NetworkName,
+  dataPlan?: { name?: string | null; dataAmount?: string | null } | null
+): string {
+  const plans = V1_NETWORK_PLANS[networkName] ?? [];
+  const candidates = [dataPlan?.dataAmount, dataPlan?.name]
+    .map((value) => value?.trim() ?? "")
+    .filter((value) => value.length > 0);
+
+  for (const candidate of candidates) {
+    const normalized = normalizeV1Key(candidate);
+    const direct = plans.find((plan) => {
+      return normalizeV1Key(plan.name) === normalized || normalizeV1Key(plan.dataAmount) === normalized;
+    });
+    if (direct) return direct.dataAmount;
+
+    const candidateMb = parseDataAmountToMB(candidate);
+    if (candidateMb <= 0) continue;
+    const byAmount = plans.find((plan) => {
+      const planNameMb = parseDataAmountToMB(plan.name);
+      const planDataAmountMb = parseDataAmountToMB(plan.dataAmount);
+      return candidateMb === planNameMb || candidateMb === planDataAmountMb;
+    });
+    if (byAmount) return byAmount.dataAmount;
+  }
+
+  return candidates[0] ?? "1GB";
 }
 
 function mapGhBundleServicesToPreviewNetworks(services: GhBundleService[]): PreviewNetwork[] {
@@ -1887,12 +1952,24 @@ export const dataProviderService = {
       };
       console.log("[fulfillOrder] GhBundle payload:", JSON.stringify(payload));
     } else if (isV1Provider(config)) {
-      const networkId = V1_NETWORKS.find((n) => n.name === (order.network?.name ?? ""))?.apiId ?? 9;
+      const resolvedNetwork = resolveV1Network(order.network?.name);
+      const size = resolveV1PlanSize(resolvedNetwork.name, {
+        name: order.dataPlan?.name,
+        dataAmount: order.dataPlan?.dataAmount
+      });
       payload = {
         beneficiary_number: order.recipientNumber,
-        network_id: networkId,
-        size: order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "1GB"
+        network_id: resolvedNetwork.apiId,
+        size
       };
+      console.log("[fulfillOrder] V1 network mapping:", JSON.stringify({
+        originalNetwork: order.network?.name ?? null,
+        resolvedNetwork: resolvedNetwork.name,
+        networkId: resolvedNetwork.apiId,
+        originalPlanName: order.dataPlan?.name ?? null,
+        originalDataAmount: order.dataPlan?.dataAmount ?? null,
+        resolvedSize: size
+      }));
       console.log("[fulfillOrder] V1 payload:", JSON.stringify(payload));
     } else {
       payload = {
