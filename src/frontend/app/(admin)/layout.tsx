@@ -136,7 +136,10 @@ export default function AdminLayout({
               <span className="text-lg font-black text-[#0f172a]">GHBUNDLE</span>
             </div>
 
-            <div className="rounded-2xl bg-[#f4f7fb] p-4">
+            <Link
+              href="/admin/settings/profile"
+              className="rounded-2xl bg-[#f4f7fb] p-4 transition hover:bg-[#e9eff8]"
+            >
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-slate-200" />
                 <div>
@@ -144,7 +147,7 @@ export default function AdminLayout({
                   <p className="text-xs text-slate-500">Main Administrator</p>
                 </div>
               </div>
-            </div>
+            </Link>
 
             <nav className="flex flex-1 flex-col gap-2">
               {navItems.map((item) => {

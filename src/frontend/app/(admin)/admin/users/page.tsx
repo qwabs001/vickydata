@@ -8,12 +8,14 @@ import { formatCurrency } from "@/shared/utils/formatters";
 import { downloadCsv } from "@/frontend/lib/exportCsv";
 
 type UserStatus = "Active" | "Suspended" | "VIP";
+type UserRole = "CUSTOMER" | "AGENT" | "ADMIN";
 
 interface UserRow {
   id: string;
   name: string;
   initials: string;
   phone: string;
+  role: UserRole;
   joined: string;
   orders: number;
   referrals: number;
@@ -47,6 +49,7 @@ const statusFilters = ["All", "Active", "Suspended", "VIP"] as const;
 const PAGE_SIZE = 7;
 
 const statusOptions: UserStatus[] = ["Active", "Suspended", "VIP"];
+const roleOptions: UserRole[] = ["CUSTOMER", "AGENT"];
 
 const getInitials = (name: string) => {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -68,6 +71,11 @@ const getStatusLabel = (status: string, vip: boolean) => {
   return "Active";
 };
 
+const shortOrderId = (orderNumber: string) => {
+  const cleaned = (orderNumber ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return cleaned.slice(-5) || "-----";
+};
+
 export default function Page() {
   const { user, login } = useAuth();
   const router = useRouter();
@@ -76,6 +84,7 @@ export default function Page() {
   const [statusFilter, setStatusFilter] = useState<(typeof statusFilters)[number]>("All");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showReferralsModal, setShowReferralsModal] = useState(false);
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [referralsData, setReferralsData] = useState<ReferredUser[]>([]);
   const [referralsLoading, setReferralsLoading] = useState(false);
   const [referralsUserName, setReferralsUserName] = useState("");
@@ -87,7 +96,11 @@ export default function Page() {
     joined: "",
     orders: "",
     balance: "",
-    status: "Active" as UserStatus
+    role: "CUSTOMER" as UserRole,
+    status: "Active" as UserStatus,
+    rewardsAdjustment: "",
+    password: "",
+    confirmPassword: ""
   });
   const [walletModalUser, setWalletModalUser] = useState<UserRow | null>(null);
   const [walletAction, setWalletAction] = useState<"credit" | "debit">("credit");
@@ -104,7 +117,7 @@ export default function Page() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch("/api/users", {
+        const response = await fetch("/api/users?includeAgents=true&limit=300", {
           headers: { "x-user-id": user.id }
         });
         const data = await response.json().catch(() => null);
@@ -125,6 +138,7 @@ export default function Page() {
             name,
             initials: getInitials(name),
             phone: user.phoneNumber,
+            role: user.role,
             joined: formatJoined(user.createdAt),
             orders: user.ordersCount ?? 0,
             referrals: user.referralsCount ?? 0,
@@ -155,7 +169,7 @@ export default function Page() {
     const suspended = users.filter((user) => user.status === "Suspended").length;
     const newThisWeek = users.filter((user) => user.isNew).length;
     return [
-      { label: "Total Customers", value: total.toLocaleString("en-US"), accent: "bg-[#e7efff] text-[#2563eb]" },
+      { label: "Total Users", value: total.toLocaleString("en-US"), accent: "bg-[#e7efff] text-[#2563eb]" },
       { label: "Active", value: active.toLocaleString("en-US"), accent: "bg-[#ecfdf3] text-[#16a34a]" },
       { label: "Suspended", value: suspended.toLocaleString("en-US"), accent: "bg-[#fee2e2] text-[#ef4444]" },
       { label: "New This Week", value: newThisWeek.toLocaleString("en-US"), accent: "bg-[#fff6dd] text-[#f59e0b]" }
@@ -188,6 +202,17 @@ export default function Page() {
     setUsersPage(1);
   }, [search, statusFilter]);
 
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest("[data-user-actions]")) {
+        setActionMenuId(null);
+      }
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
+  }, []);
+
   const openEdit = (user: UserRow) => {
     setEditForm({
       name: user.name,
@@ -195,16 +220,23 @@ export default function Page() {
       joined: user.joined,
       orders: user.orders.toString(),
       balance: user.balance.toFixed(2),
-      status: user.status
+      role: user.role,
+      status: user.status,
+      rewardsAdjustment: "",
+      password: "",
+      confirmPassword: ""
     });
     setEditingId(user.id);
+    setActionMenuId(null);
   };
 
   const closeEdit = () => {
     setEditingId(null);
+    setActionMenuId(null);
   };
 
   const openReferrals = async (row: UserRow) => {
+    setActionMenuId(null);
     setReferralsUserName(row.name);
     setShowReferralsModal(true);
     setReferralsData([]);
@@ -225,11 +257,23 @@ export default function Page() {
 
   const handleEditSave = async () => {
     if (!editingId) return;
+    if (editForm.password && editForm.password !== editForm.confirmPassword) {
+      setError("Password confirmation does not match.");
+      return;
+    }
+    const rewardsAdjustment = Number(editForm.rewardsAdjustment || 0);
+    if (!Number.isFinite(rewardsAdjustment)) {
+      setError("Rewards adjustment must be a valid number.");
+      return;
+    }
     const payload = {
       username: editForm.name.trim(),
       phoneNumber: editForm.phone.trim(),
+      role: editForm.role,
       status: editForm.status === "Suspended" ? "SUSPENDED" : "ACTIVE",
-      vip: editForm.status === "VIP"
+      vip: editForm.status === "VIP",
+      password: editForm.password || undefined,
+      rewardsAdjustment: rewardsAdjustment || undefined
     };
 
     try {
@@ -251,9 +295,11 @@ export default function Page() {
                 ...user,
                 name: payload.username || user.name,
                 phone: payload.phoneNumber || user.phone,
+                role: payload.role,
                 status: editForm.status,
                 vip: editForm.status === "VIP",
-                initials: getInitials(payload.username || user.name)
+                initials: getInitials(payload.username || user.name),
+                balance: data?.rewardsBalance ?? user.balance
               }
             : user
         )
@@ -265,6 +311,7 @@ export default function Page() {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    setActionMenuId(null);
     if (!window.confirm(`Delete ${name}? This will deactivate the user.`)) {
       return;
     }
@@ -288,6 +335,7 @@ export default function Page() {
     if (!user?.id) return;
     if (!window.confirm(`Impersonate ${targetName}?`)) return;
 
+    setActionMenuId(null);
     setImpersonatingId(targetId);
     setError(null);
     try {
@@ -323,6 +371,7 @@ export default function Page() {
   };
 
   const openWalletModal = (row: UserRow) => {
+    setActionMenuId(null);
     setWalletModalUser(row);
     setWalletAction("credit");
     setWalletAmount("");
@@ -385,7 +434,7 @@ export default function Page() {
       <header className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-black text-[#0f172a] sm:text-2xl">Customers</h1>
-          <p className="text-sm text-slate-500">Manage registered users and access controls</p>
+          <p className="text-sm text-slate-500">Manage users and promoted agents in one list</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
@@ -476,7 +525,7 @@ export default function Page() {
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-[#f8fafc] text-xs uppercase text-slate-400">
               <tr>
-                <th className="px-4 py-4 text-left">Customer</th>
+                <th className="px-4 py-4 text-left">User</th>
                 <th className="px-4 py-4 text-left">Joined</th>
                 <th className="px-4 py-4 text-left">Orders</th>
                 <th className="px-4 py-4 text-left">Referrals</th>
@@ -503,7 +552,12 @@ export default function Page() {
                           {user.initials}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">{user.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-slate-900">{user.name}</p>
+                            {user.role === "AGENT" ? (
+                              <span className="rounded-full bg-[#e7efff] px-2 py-0.5 text-[10px] font-semibold text-[#2563eb]">Agent</span>
+                            ) : null}
+                          </div>
                           <p className="text-xs text-slate-500">{user.phone}</p>
                         </div>
                       </div>
@@ -544,36 +598,51 @@ export default function Page() {
                       </span>
                     </td>
                     <td className="px-4 py-4">
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <div className="relative inline-flex" data-user-actions>
                         <button
-                          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600"
-                          onClick={() => openEdit(user)}
                           type="button"
+                          className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+                          onClick={() => setActionMenuId((current) => (current === user.id ? null : user.id))}
+                          aria-label="Open customer actions"
                         >
-                          Edit
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.8 1.8 0 0 0 0-6l-1.1-.3a6.6 6.6 0 0 0-1.1-1.9l.6-1a1.8 1.8 0 0 0-2.5-2.5l-1 .6a6.6 6.6 0 0 0-1.9-1.1L12 1.6 9.6 2.8a6.6 6.6 0 0 0-1.9 1.1l-1-.6A1.8 1.8 0 0 0 4.2 5.8l.6 1a6.6 6.6 0 0 0-1.1 1.9L2.6 9a1.8 1.8 0 0 0 0 6l1.1.3a6.6 6.6 0 0 0 1.1 1.9l-.6 1a1.8 1.8 0 0 0 2.5 2.5l1-.6a6.6 6.6 0 0 0 1.9 1.1l2.4 1.2 2.4-1.2a6.6 6.6 0 0 0 1.9-1.1l1 .6a1.8 1.8 0 0 0 2.5-2.5l-.6-1a6.6 6.6 0 0 0 1.1-1.9z" />
+                          </svg>
                         </button>
-                        <button
-                          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600"
-                          onClick={() => openWalletModal(user)}
-                          type="button"
-                        >
-                          Wallet
-                        </button>
-                        <button
-                          className="rounded-full border border-[#dbeafe] bg-[#eff6ff] px-3 py-1 text-xs font-semibold text-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
-                          onClick={() => handleImpersonate(user.id, user.name)}
-                          disabled={impersonatingId === user.id || user.status === "Suspended"}
-                          type="button"
-                        >
-                          {impersonatingId === user.id ? "Opening..." : "Impersonate"}
-                        </button>
-                        <button
-                          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600"
-                          onClick={() => handleDelete(user.id, user.name)}
-                          type="button"
-                        >
-                          Delete
-                        </button>
+                        {actionMenuId === user.id ? (
+                          <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                            <button
+                              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              onClick={() => openEdit(user)}
+                              type="button"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              onClick={() => openWalletModal(user)}
+                              type="button"
+                            >
+                              Wallet
+                            </button>
+                            <button
+                              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#1d4ed8] hover:bg-[#eff6ff] disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() => handleImpersonate(user.id, user.name)}
+                              disabled={impersonatingId === user.id || user.status === "Suspended"}
+                              type="button"
+                            >
+                              {impersonatingId === user.id ? "Opening..." : "Impersonate"}
+                            </button>
+                            <button
+                              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                              onClick={() => handleDelete(user.id, user.name)}
+                              type="button"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -656,7 +725,9 @@ export default function Page() {
                                 className="flex items-center justify-between rounded-xl border border-slate-100 bg-white px-3 py-2 text-sm"
                               >
                                 <div>
-                                  <span className="font-medium text-slate-700">{o.orderNumber}</span>
+                                  <span className="font-medium text-slate-700" title={o.orderNumber}>
+                                    #{shortOrderId(o.orderNumber)}
+                                  </span>
                                   <span className="ml-2 text-slate-500">{o.plan}</span>
                                 </div>
                                 <span className="font-semibold text-slate-900">
@@ -729,6 +800,20 @@ export default function Page() {
                 </label>
               </div>
               <label className="text-xs font-semibold text-slate-500">
+                Role
+                <select
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
+                  value={editForm.role}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, role: event.target.value as UserRole }))}
+                >
+                  {roleOptions.map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-slate-500">
                 Status
                 <select
                   className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
@@ -742,6 +827,37 @@ export default function Page() {
                   ))}
                 </select>
               </label>
+              <label className="text-xs font-semibold text-slate-500">
+                Rewards Count Adjustment (+ / -)
+                <input
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
+                  value={editForm.rewardsAdjustment}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, rewardsAdjustment: event.target.value }))}
+                  placeholder="e.g. 10 or -5"
+                />
+              </label>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className="text-xs font-semibold text-slate-500">
+                  Reset Password
+                  <input
+                    type="password"
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
+                    value={editForm.password}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, password: event.target.value }))}
+                    placeholder="Leave empty to keep current"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-500">
+                  Confirm Password
+                  <input
+                    type="password"
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
+                    value={editForm.confirmPassword}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
+                    placeholder="Confirm new password"
+                  />
+                </label>
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">

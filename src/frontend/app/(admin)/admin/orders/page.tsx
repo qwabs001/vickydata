@@ -23,6 +23,18 @@ const statusMap: Record<string, string> = {
 const dateRanges = ["Last 7 days", "Last 30 days", "This year"];
 const PAGE_SIZE = 7;
 
+const shortOrderId = (orderNumber: string) => {
+  const cleaned = (orderNumber ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const suffix = cleaned.slice(-5);
+  return suffix || "-----";
+};
+
+const shortenReason = (reason: string, maxLen = 62) => {
+  const trimmed = reason.trim();
+  if (trimmed.length <= maxLen) return trimmed;
+  return `${trimmed.slice(0, maxLen - 1)}…`;
+};
+
 export default function Page() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
@@ -37,6 +49,7 @@ export default function Page() {
   const [userOrdersModal, setUserOrdersModal] = useState<{ userId: string; username: string } | null>(null);
   const [userOrders, setUserOrders] = useState<any[]>([]);
   const [userOrdersLoading, setUserOrdersLoading] = useState(false);
+  const [mobileReason, setMobileReason] = useState<string | null>(null);
   const [ordersPage, setOrdersPage] = useState(1);
 
   useEffect(() => {
@@ -45,7 +58,7 @@ export default function Page() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch("/api/orders?scope=all&limit=500", {
+        const response = await fetch("/api/orders?scope=all&limit=300", {
           headers: { "x-user-id": user.id }
         });
         const data = await response.json().catch(() => null);
@@ -129,7 +142,7 @@ export default function Page() {
   const handleRefresh = () => {
     if (user?.id) {
       setLoading(true);
-      fetch("/api/orders?scope=all", { headers: { "x-user-id": user.id } })
+      fetch("/api/orders?scope=all&limit=300", { headers: { "x-user-id": user.id } })
         .then((res) => res.json().catch(() => ({})))
         .then((data) => setOrders(data?.orders ?? []))
         .catch(() => setOrders([]))
@@ -191,9 +204,9 @@ export default function Page() {
             <span className="rounded-full bg-[#f1f5f9] px-3 py-1 font-semibold text-slate-600">
               {orders.length} Total
             </span>
-            {filteredOrders.length > 8 ? (
+            {filteredOrders.length > PAGE_SIZE ? (
               <span className="rounded-full bg-[#f8fafc] px-3 py-1 font-semibold text-slate-500">
-                Showing 8 of {filteredOrders.length}
+                Showing {Math.min(PAGE_SIZE, filteredOrders.length)} of {filteredOrders.length}
               </span>
             ) : null}
           </div>
@@ -297,7 +310,9 @@ export default function Page() {
                 <div key={order.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{order.orderNumber}</p>
+                      <p className="text-sm font-semibold text-slate-900" title={order.orderNumber}>
+                        #{shortOrderId(order.orderNumber)}
+                      </p>
                       <p className="text-xs text-slate-500">
                         {order.user ? (
                           <button
@@ -318,7 +333,17 @@ export default function Page() {
                     </span>
                   </div>
                   {order.status === "FAILED" && order.failedReason ? (
-                    <p className="mt-2 text-xs text-rose-600">{order.failedReason}</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <p className="text-xs text-rose-600">{shortenReason(order.failedReason, 46)}</p>
+                      <button
+                        type="button"
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-[11px] font-bold text-rose-600"
+                        onClick={() => setMobileReason(order.failedReason)}
+                        aria-label="View full failure reason"
+                      >
+                        ?
+                      </button>
+                    </div>
                   ) : null}
                   <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
                     <div>
@@ -408,17 +433,17 @@ export default function Page() {
         </div>
 
         <div className="mt-6 hidden overflow-visible rounded-2xl border border-slate-100 md:block">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-sm">
             <thead className="bg-[#f8fafc] text-xs uppercase text-slate-400">
               <tr>
-                <th className="px-4 py-4 text-left">Order ID</th>
-                <th className="px-4 py-4 text-left">Customer</th>
-                <th className="px-4 py-4 text-left">Recipient</th>
-                <th className="px-4 py-4 text-left">Network</th>
-                <th className="px-4 py-4 text-left">Plan</th>
-                <th className="px-4 py-4 text-left">Amount</th>
-                <th className="px-4 py-4 text-left">Status</th>
-                <th className="px-4 py-4 text-left">Actions</th>
+                <th className="w-[12%] px-4 py-4 text-left">Order ID</th>
+                <th className="w-[14%] px-4 py-4 text-left">Customer</th>
+                <th className="w-[12%] px-4 py-4 text-left">Recipient</th>
+                <th className="w-[8%] px-4 py-4 text-left">Network</th>
+                <th className="w-[6%] px-4 py-4 text-left">Plan</th>
+                <th className="w-[8%] px-4 py-4 text-left">Amount</th>
+                <th className="w-[32%] px-4 py-4 text-left">Status</th>
+                <th className="w-[8%] px-4 py-4 text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -436,7 +461,9 @@ export default function Page() {
                   const canResend = order.status !== "COMPLETED";
                   return (
                     <tr key={order.id} className="border-t border-slate-100">
-                      <td className="px-4 py-4 font-semibold text-slate-700">{order.orderNumber}</td>
+                      <td className="px-4 py-4 font-semibold text-slate-700" title={order.orderNumber}>
+                        #{shortOrderId(order.orderNumber)}
+                      </td>
                       <td className="px-4 py-4 text-slate-600">
                         {order.user ? (
                           <button
@@ -457,12 +484,15 @@ export default function Page() {
                       <td className="px-4 py-4 text-slate-900 font-semibold">{order.currency} {order.amount.toFixed(2)}</td>
                       <td className="px-4 py-4">
                         <div className="flex flex-col gap-1">
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[statusLabel] ?? "bg-slate-100 text-slate-600"}`}>
+                          <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[statusLabel] ?? "bg-slate-100 text-slate-600"}`}>
                             {statusLabel}
                           </span>
                           {order.status === "FAILED" && order.failedReason ? (
-                            <span className="text-[11px] text-rose-600">
-                              {order.failedReason}
+                            <span
+                              className="max-w-[340px] truncate text-[11px] text-rose-600"
+                              title={order.failedReason}
+                            >
+                              {shortenReason(order.failedReason, 78)}
                             </span>
                           ) : null}
                         </div>
@@ -567,6 +597,27 @@ export default function Page() {
         ) : null}
       </section>
 
+      {mobileReason ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 md:hidden" onClick={() => setMobileReason(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Failure Details</h3>
+              <button
+                type="button"
+                onClick={() => setMobileReason(null)}
+                className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+                aria-label="Close failure details"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-rose-600">{mobileReason}</p>
+          </div>
+        </div>
+      ) : null}
+
       {userOrdersModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setUserOrdersModal(null)}>
           <div className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -589,7 +640,9 @@ export default function Page() {
                     return (
                       <li key={order.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3 text-sm">
                         <div>
-                          <span className="font-semibold text-slate-800">{order.orderNumber}</span>
+                          <span className="font-semibold text-slate-800" title={order.orderNumber}>
+                            #{shortOrderId(order.orderNumber)}
+                          </span>
                           <span className="ml-2 text-slate-500">{order.recipientNumber ?? "—"}</span>
                           <span className="mx-2 text-slate-300">·</span>
                           <span className="text-slate-500">{order.network?.displayName ?? order.network?.name}</span>

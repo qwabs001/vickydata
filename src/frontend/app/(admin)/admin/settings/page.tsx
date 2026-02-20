@@ -5,6 +5,11 @@ import Link from "next/link";
 
 const cards = [
   {
+    title: "Profile & Security",
+    description: "Update admin profile details, contact email, and password.",
+    href: "/admin/settings/profile"
+  },
+  {
     title: "API Configuration",
     description: "Connect data bundle API to sync networks and auto-fulfill orders.",
     href: "/admin/settings/api"

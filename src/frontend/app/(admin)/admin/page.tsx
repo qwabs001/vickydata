@@ -21,6 +21,11 @@ const statusStyles: Record<string, string> = {
   Failed: "bg-[#fee2e2] text-[#ef4444]"
 };
 
+function shortOrderId(orderNumber: string) {
+  const cleaned = (orderNumber ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return cleaned.slice(-5) || "-----";
+}
+
 function isRevenueOrder(order: { status?: string; paymentStatus?: string }) {
   return (
     order.paymentStatus === "COMPLETED" &&
@@ -44,8 +49,8 @@ export default function Page() {
       setLoading(true);
       try {
         const [ordersResponse, usersResponse, networksResponse] = await Promise.all([
-          fetch("/api/orders?scope=all", { headers: { "x-user-id": user.id } }),
-          fetch("/api/users", { headers: { "x-user-id": user.id } }),
+          fetch("/api/orders?scope=all&limit=300", { headers: { "x-user-id": user.id } }),
+          fetch("/api/users?includeAgents=true&limit=300", { headers: { "x-user-id": user.id } }),
           fetch("/api/networks?scope=all", { headers: { "x-user-id": user.id } })
         ]);
         const ordersData = await ordersResponse.json().catch(() => null);
@@ -309,7 +314,9 @@ export default function Page() {
                   const statusLabel = statusMap[order.status] ?? order.status;
                   return (
                     <tr key={order.id} className="border-t border-slate-100">
-                      <td className="px-4 py-3 font-semibold text-slate-700">{order.orderNumber}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-700" title={order.orderNumber}>
+                        #{shortOrderId(order.orderNumber)}
+                      </td>
                       <td className="px-4 py-3 text-slate-600">
                         {order.user?.username ?? "Customer"}
                         <div className="text-xs text-slate-400">{order.user?.phoneNumber}</div>
