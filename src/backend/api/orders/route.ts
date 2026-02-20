@@ -25,14 +25,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // Test database connection first
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-    } catch (dbError) {
-      console.error("Database connection test failed:", dbError);
-      return NextResponse.json({ error: "Database connection failed." }, { status: 503 });
-    }
-
     // When fetching by userId, allow only that user or an admin
     if (scope !== "all" && userId) {
       const requesterId = request.headers.get("x-user-id");
@@ -77,16 +69,8 @@ export async function GET(request: Request) {
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
         skip
-      }).catch((err) => {
-        console.error("Prisma order.findMany error:", err);
-        throw err;
       }),
-      shouldPaginate
-        ? prisma.order.count({ where: whereClause }).catch((err) => {
-            console.error("Prisma order.count error:", err);
-            throw err;
-          })
-        : Promise.resolve(null)
+      shouldPaginate ? prisma.order.count({ where: whereClause }) : Promise.resolve(null)
     ]);
 
     const cacheForCustomer = scope !== "all" ? "private, max-age=10, stale-while-revalidate=20" : undefined;

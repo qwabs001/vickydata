@@ -9,13 +9,6 @@ export async function GET(request: Request) {
       return auth.response;
     }
 
-    // Test database connection first
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-    } catch (dbError) {
-      console.error("Database connection test failed:", dbError);
-      return NextResponse.json({ error: "Database connection failed." }, { status: 503 });
-    }
     const { searchParams } = new URL(request.url);
     const roleParam = (searchParams.get("role") ?? "CUSTOMER").toUpperCase();
     const roleFilter =
@@ -33,9 +26,6 @@ export async function GET(request: Request) {
       },
       orderBy: { createdAt: "desc" },
       take: limitParam
-    }).catch((err) => {
-      console.error("Prisma user.findMany error:", err);
-      throw err;
     });
 
     const userIds = users.map((user) => user.id);
