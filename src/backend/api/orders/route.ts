@@ -38,14 +38,18 @@ export async function GET(request: Request) {
 
     // Run sync in background so response isn't delayed (sync can hit external provider API)
     if (scope !== "all" && userId) {
-      void import("@/backend/services/dataProvider/dataProviderService").then(({ dataProviderService }) =>
-        dataProviderService.syncUserInProgressOrders(userId).catch((syncError) => {
-          console.error("Order status sync warning:", syncError);
-        })
-      );
+      void import("@/backend/services/dataProvider/dataProviderService")
+        .then(({ dataProviderService }) =>
+          dataProviderService.syncUserInProgressOrders(userId).catch((syncError) => {
+            console.error("Order status sync warning:", syncError);
+          })
+        )
+        .catch((importError) => {
+          console.error("Failed to import dataProviderService for sync:", importError);
+        });
     }
 
-    const whereClause = scope === "all" ? undefined : { userId: userId as string };
+    const whereClause = scope === "all" ? undefined : userId ? { userId } : undefined;
     const maxLimit = scope === "all" ? 2000 : 200;
     const requestedLimit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(maxLimit, Math.floor(limitParam)) : 0;
     const defaultLimit = scope === "all" ? 500 : 100;

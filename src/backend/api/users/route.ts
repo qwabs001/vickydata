@@ -27,13 +27,16 @@ export async function GET(request: Request) {
       take: limitParam
     });
 
-    const orderTotals = await prisma.order.groupBy({
-      by: ["userId"],
-      where: {
-        userId: { in: users.map((user) => user.id) }
-      },
-      _sum: { amount: true }
-    });
+    const userIds = users.map((user) => user.id);
+    const orderTotals = userIds.length > 0
+      ? await prisma.order.groupBy({
+          by: ["userId"],
+          where: {
+            userId: { in: userIds }
+          },
+          _sum: { amount: true }
+        })
+      : [];
     const amountByUser = new Map(
       orderTotals.map((item) => [item.userId, item._sum.amount ?? 0])
     );
