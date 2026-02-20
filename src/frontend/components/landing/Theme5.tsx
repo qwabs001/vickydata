@@ -96,9 +96,12 @@ const Theme5: React.FC = () => {
   const selectedNetwork = useMemo(() => {
     if (!selectedNetworkKey) return null;
     return networks.find((network) => {
-      const normalized = normalizeName(network.name);
+      const normalizedName = normalizeName(network.name);
+      const normalizedDisplay = normalizeName(network.displayName);
       const card = NETWORK_CARD_CONFIG.find((c) => c.key === selectedNetworkKey);
-      return card?.matchers.some((matcher) => normalized.includes(matcher));
+      return card?.matchers.some(
+        (matcher) => normalizedName.includes(matcher) || normalizedDisplay.includes(matcher)
+      );
     }) || null;
   }, [networks, selectedNetworkKey]);
 
@@ -141,8 +144,11 @@ const Theme5: React.FC = () => {
   const networkCards = useMemo(() => {
     return NETWORK_CARD_CONFIG.map((card) => {
       const matchedNetwork = networks.find((network) => {
-        const normalized = normalizeName(network.name);
-        return card.matchers.some((matcher) => normalized.includes(matcher));
+        const normalizedName = normalizeName(network.name);
+        const normalizedDisplay = normalizeName(network.displayName);
+        return card.matchers.some(
+          (matcher) => normalizedName.includes(matcher) || normalizedDisplay.includes(matcher)
+        );
       });
 
       const networkPlans = plans.filter((plan) => {
