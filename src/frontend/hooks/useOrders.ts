@@ -37,7 +37,9 @@ export function useOrders(options: UseOrdersOptions = {}) {
         params.set("limit", String(pageSize));
         params.set("page", String(pageToLoad));
       }
-      const response = await fetch(`/api/orders?${params.toString()}`);
+      const response = await fetch(`/api/orders?${params.toString()}`, {
+        headers: { "x-user-id": user.id }
+      });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
         setError(data?.error ?? "Unable to load orders.");

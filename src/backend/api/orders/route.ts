@@ -163,7 +163,9 @@ export async function POST(request: Request) {
     });
 
     // For wallet/paid orders, send to provider immediately
-    if (order.status === "PROCESSING" || order.paymentStatus === "COMPLETED") {
+    // Trigger fulfillment when payment is completed (wallet or payment callback) OR when status is PROCESSING
+    const shouldFulfill = order.paymentStatus === "COMPLETED" || order.status === "PROCESSING";
+    if (shouldFulfill && order.status !== "COMPLETED" && order.status !== "FAILED") {
       try {
         const { dataProviderService } = await import("@/backend/services/dataProvider/dataProviderService");
         const result = await dataProviderService.fulfillOrder(order.id);
@@ -174,6 +176,12 @@ export async function POST(request: Request) {
       } catch (err) {
         console.error("[orders POST] Order fulfillment error:", err);
       }
+    } else if (!shouldFulfill) {
+      console.log("[orders POST] Order not ready for fulfillment:", {
+        orderId: order.id,
+        status: order.status,
+        paymentStatus: order.paymentStatus
+      });
     }
 
     return NextResponse.json({ ok: true, order });
