@@ -95,6 +95,16 @@ function getSignaturePath(baseUrl: string, path: string): string {
   }
 }
 
+function isV1SizeVariantUnavailableMessage(value?: string | null): boolean {
+  const lower = (value ?? "").toLowerCase();
+  if (!lower) return false;
+  return (
+    lower.includes("size variant not available") ||
+    (lower.includes("variant") && lower.includes("not available")) ||
+    lower.includes("bundle size is unavailable")
+  );
+}
+
 /** Parse provider API error into a clear, user-friendly failure reason. */
 function parseProviderError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
@@ -134,6 +144,9 @@ function parseProviderError(err: unknown): string {
   }
   if (status === 401 || status === 403 || lower.includes("unauthorized") || lower.includes("forbidden") || (lower.includes("auth") && (lower.includes("fail") || lower.includes("invalid") || lower.includes("error")))) {
     return "Provider API authentication failed. Check your API key, API secret, and base URL in Settings > API Configuration.";
+  }
+  if (isV1SizeVariantUnavailableMessage(providerMsg) || isV1SizeVariantUnavailableMessage(lower)) {
+    return "Selected bundle size is unavailable on provider for this network. Use a plan size that exists in the provider catalog.";
   }
   if (status === 404 || lower.includes("not found")) {
     return "Plan or network not found on provider. Verify your plan catalog.";
@@ -772,6 +785,65 @@ function resolveV1PlanSize(
   }
 
   return candidates[0] ?? "1GB";
+}
+
+type V1PurchasePayload = {
+  beneficiary_number: string;
+  network_id: number;
+  size: string;
+};
+
+function buildV1SizeCandidates(size: string): string[] {
+  const raw = size.trim();
+  if (!raw) return [];
+
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const push = (value: string) => {
+    const v = value.trim();
+    if (!v) return;
+    const key = v.toUpperCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(v);
+  };
+
+  push(raw);
+  push(raw.toLowerCase());
+  push(raw.toLowerCase().replace(/\s+/g, ""));
+
+  const gbMatch = raw.match(/^(\d+(?:\.\d+)?)\s*GB$/i);
+  if (gbMatch) {
+    const gb = Number(gbMatch[1]);
+    if (Number.isFinite(gb) && gb > 0) {
+      const compact = Number.isInteger(gb) ? String(Math.trunc(gb)) : String(gb);
+      const mb = Math.round(gb * 1024);
+      push(`${compact}gb`);
+      push(`${compact} gb`);
+      push(`${compact} GB`);
+      push(`${mb}MB`);
+      push(`${mb}mb`);
+      push(`${mb} MB`);
+      push(`${mb} mb`);
+    }
+  }
+
+  const mbMatch = raw.match(/^(\d+(?:\.\d+)?)\s*MB$/i);
+  if (mbMatch) {
+    const mb = Number(mbMatch[1]);
+    if (Number.isFinite(mb) && mb > 0) {
+      const gb = mb / 1024;
+      if (Number.isFinite(gb) && gb > 0) {
+        const compact = Number.isInteger(gb) ? String(Math.trunc(gb)) : String(gb);
+        push(`${compact}GB`);
+        push(`${compact}gb`);
+        push(`${compact} GB`);
+        push(`${compact} gb`);
+      }
+    }
+  }
+
+  return candidates;
 }
 
 function mapGhBundleServicesToPreviewNetworks(services: GhBundleService[]): PreviewNetwork[] {
@@ -1871,6 +1943,7 @@ export const dataProviderService = {
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
     // Detect GhBundle API (direct or proxy URLs)
     const isGhBundle = isGhBundleBaseUrl(config.baseUrl);
+    const isV1 = isV1Provider(config);
     // Default purchase path: /orders for ghbundle.com, /api/purchase for others
     const purchasePath = isGhBundle
       ? resolveGhBundleEndpoint(endpoints.purchase, "/orders")
@@ -1878,6 +1951,7 @@ export const dataProviderService = {
     const purchaseMethod = endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
 
     let payload: object;
+    let v1PayloadCandidates: V1PurchasePayload[] | null = null;
     if (isGhBundle) {
       // GhBundle API format: {service_id, phone, qty, client_order_id}
       // Try to get service_id from externalOrder if available
@@ -1951,24 +2025,31 @@ export const dataProviderService = {
         client_order_id: order.orderNumber
       };
       console.log("[fulfillOrder] GhBundle payload:", JSON.stringify(payload));
-    } else if (isV1Provider(config)) {
+    } else if (isV1) {
       const resolvedNetwork = resolveV1Network(order.network?.name);
       const size = resolveV1PlanSize(resolvedNetwork.name, {
         name: order.dataPlan?.name,
         dataAmount: order.dataPlan?.dataAmount
       });
-      payload = {
+      const basePayload: V1PurchasePayload = {
         beneficiary_number: order.recipientNumber,
         network_id: resolvedNetwork.apiId,
         size
       };
+      const sizeCandidates = buildV1SizeCandidates(size);
+      v1PayloadCandidates = (sizeCandidates.length > 0 ? sizeCandidates : [size]).map((candidateSize) => ({
+        ...basePayload,
+        size: candidateSize
+      }));
+      payload = v1PayloadCandidates[0];
       console.log("[fulfillOrder] V1 network mapping:", JSON.stringify({
         originalNetwork: order.network?.name ?? null,
         resolvedNetwork: resolvedNetwork.name,
         networkId: resolvedNetwork.apiId,
         originalPlanName: order.dataPlan?.name ?? null,
         originalDataAmount: order.dataPlan?.dataAmount ?? null,
-        resolvedSize: size
+        resolvedSize: size,
+        sizeCandidates: v1PayloadCandidates.map((p) => p.size)
       }));
       console.log("[fulfillOrder] V1 payload:", JSON.stringify(payload));
     } else {
@@ -1987,97 +2068,147 @@ export const dataProviderService = {
     console.log("[fulfillOrder] Calling provider API:", config.baseUrl + purchasePath, "Method:", purchaseMethod);
 
     try {
+      const sendPurchaseRequest = async (activePayload: object): Promise<{
+        message?: string;
+        order?: { reference_id?: number; total?: string; status?: string };
+        reference?: string;
+        transactionId?: string;
+        success?: boolean;
+      }> => {
+        try {
+          return await apiRequest<{
+            message?: string;
+            order?: { reference_id?: number; total?: string; status?: string };
+            reference?: string;
+            transactionId?: string;
+            success?: boolean;
+          }>(
+            config.baseUrl,
+            purchasePath,
+            {
+              method: purchaseMethod,
+              apiKey: config.apiKey,
+              apiSecret: config.apiSecret ?? undefined,
+              body: purchaseMethod === "POST" ? activePayload : undefined
+            }
+          );
+        }
+        catch (firstError: unknown) {
+          if (purchaseMethod === "POST" && (firstError as { status?: number })?.status === 405) {
+            console.log("[fulfillOrder] POST returned 405, trying GET with query params");
+            const queryParams = new URLSearchParams();
+            Object.entries(activePayload).forEach(([key, value]) => {
+              queryParams.append(key, String(value));
+            });
+            const pathWithQuery = `${purchasePath}${purchasePath.includes("?") ? "&" : "?"}${queryParams.toString()}`;
+            return apiRequest<{
+              message?: string;
+              order?: { reference_id?: number; total?: string; status?: string };
+              reference?: string;
+              transactionId?: string;
+              success?: boolean;
+            }>(
+              config.baseUrl,
+              pathWithQuery,
+              {
+                method: "GET",
+                apiKey: config.apiKey,
+                apiSecret: config.apiSecret ?? undefined
+              }
+            );
+          }
+          throw firstError;
+        }
+      };
+
+      const attempts: object[] = v1PayloadCandidates != null && v1PayloadCandidates.length > 0
+        ? v1PayloadCandidates
+        : [payload];
       let result: {
         message?: string;
         order?: { reference_id?: number; total?: string; status?: string };
         reference?: string;
         transactionId?: string;
         success?: boolean;
-      };
-      
-      // Try the configured method first
-      try {
-        result = await apiRequest<typeof result>(
-          config.baseUrl,
-          purchasePath,
-          {
-            method: purchaseMethod,
-            apiKey: config.apiKey,
-            apiSecret: config.apiSecret ?? undefined,
-            body: purchaseMethod === "POST" ? payload : undefined // Only send body for POST
+      } | null = null;
+
+      for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
+        payload = attempts[attemptIndex];
+        if (attempts.length > 1) {
+          console.log(`[fulfillOrder] Provider attempt ${attemptIndex + 1}/${attempts.length}:`, JSON.stringify(payload));
+        }
+
+        try {
+          result = await sendPurchaseRequest(payload);
+        } catch (attemptError) {
+          const attemptMsg = parseProviderError(attemptError);
+          const shouldRetryVariant = isV1 && isV1SizeVariantUnavailableMessage(attemptMsg) && attemptIndex < attempts.length - 1;
+          if (shouldRetryVariant) {
+            console.warn(`[fulfillOrder] Variant unavailable, trying next size candidate (${attemptIndex + 2}/${attempts.length})`);
+            continue;
           }
-        );
-      } catch (firstError: unknown) {
-        // If POST returns 405, try GET as fallback
-        if (purchaseMethod === "POST" && (firstError as { status?: number })?.status === 405) {
-          console.log("[fulfillOrder] POST returned 405, trying GET with query params");
-          const queryParams = new URLSearchParams();
-          Object.entries(payload).forEach(([key, value]) => {
-            queryParams.append(key, String(value));
-          });
-          const pathWithQuery = `${purchasePath}${purchasePath.includes("?") ? "&" : "?"}${queryParams.toString()}`;
-          result = await apiRequest<typeof result>(
-            config.baseUrl,
-            pathWithQuery,
-            {
-              method: "GET",
-              apiKey: config.apiKey,
-              apiSecret: config.apiSecret ?? undefined
-            }
+          throw attemptError;
+        }
+
+        console.log("[fulfillOrder] Provider API response:", JSON.stringify(result));
+
+        const reference =
+          extractProviderReference(result) ??
+          result.order?.reference_id?.toString() ??
+          result.reference ??
+          result.transactionId ??
+          `EXT-${Date.now()}`;
+
+        const providerState = extractProviderState(result);
+        console.log("[fulfillOrder] Provider state:", providerState, "| reference:", reference, "| orderId:", orderId);
+
+        if (providerState === "FAILED") {
+          const failedReason = extractProviderMessage(result) ?? "Provider marked this order as failed.";
+          const shouldRetryVariant = isV1 && isV1SizeVariantUnavailableMessage(failedReason) && attemptIndex < attempts.length - 1;
+          if (shouldRetryVariant) {
+            console.warn(`[fulfillOrder] Provider rejected size variant, trying next candidate (${attemptIndex + 2}/${attempts.length})`);
+            continue;
+          }
+          await markOrderFailed(
+            orderId,
+            failedReason,
+            normalizeJsonObject(payload),
+            normalizeJsonObject(result)
           );
-        } else {
-          throw firstError;
+          return { ok: false, error: failedReason, reference, status: "FAILED" };
         }
-      }
 
-      console.log("[fulfillOrder] Provider API response:", JSON.stringify(result));
-
-      const reference =
-        extractProviderReference(result) ??
-        result.order?.reference_id?.toString() ??
-        result.reference ??
-        result.transactionId ??
-        `EXT-${Date.now()}`;
-
-      const providerState = extractProviderState(result);
-      console.log("[fulfillOrder] Provider state:", providerState, "| reference:", reference, "| orderId:", orderId);
-
-      if (providerState === "FAILED") {
-        const failedReason = extractProviderMessage(result) ?? "Provider marked this order as failed.";
-        await markOrderFailed(
-          orderId,
-          failedReason,
-          normalizeJsonObject(payload),
-          normalizeJsonObject(result)
-        );
-        return { ok: false, error: failedReason, reference, status: "FAILED" };
-      }
-
-      if (providerState === "COMPLETED") {
-        await markOrderCompleted(
-          orderId,
-          normalizeJsonObject(payload),
-          normalizeJsonObject(result)
-        );
-        return { ok: true, reference, status: "COMPLETED" };
-      }
-
-      await prisma.order.updateMany({
-        where: {
-          id: orderId,
-          status: { in: ["PENDING", "PROCESSING", "FAILED"] }
-        },
-        data: {
-          status: "PROCESSING",
-          paymentStatus: "COMPLETED",
-          completedAt: null,
-          failedReason: null,
-          apiRequestPayload: normalizeJsonObject(payload),
-          apiResponsePayload: normalizeJsonObject(result)
+        if (providerState === "COMPLETED") {
+          await markOrderCompleted(
+            orderId,
+            normalizeJsonObject(payload),
+            normalizeJsonObject(result)
+          );
+          return { ok: true, reference, status: "COMPLETED" };
         }
-      });
 
-      return { ok: true, reference, status: "PROCESSING" };
+        await prisma.order.updateMany({
+          where: {
+            id: orderId,
+            status: { in: ["PENDING", "PROCESSING", "FAILED"] }
+          },
+          data: {
+            status: "PROCESSING",
+            paymentStatus: "COMPLETED",
+            completedAt: null,
+            failedReason: null,
+            apiRequestPayload: normalizeJsonObject(payload),
+            apiResponsePayload: normalizeJsonObject(result)
+          }
+        });
+
+        return { ok: true, reference, status: "PROCESSING" };
+      }
+
+      const fallbackMessage = isV1
+        ? "Selected bundle size is unavailable on provider for this network. Use a plan size that exists in the provider catalog."
+        : "Unable to fulfill order with provider.";
+      throw new Error(fallbackMessage);
     } catch (err) {
       const friendlyMsg = parseProviderError(err);
       const rawMsg = err instanceof Error ? err.message : "Unknown error";

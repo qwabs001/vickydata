@@ -7,19 +7,17 @@ import { ContactWidget } from "@/frontend/components/ContactWidget";
 import { getBrandTheme, hexToRgbString } from "@/backend/lib/theme";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "900"] });
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://keldatagh.com";
-const DEFAULT_ICON = "/images/networks/keldatagh.png";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ghbundle.com";
+const DEFAULT_ICON = "/images/networks/ghbundlw.png?v=2";
 
 export async function generateMetadata(): Promise<Metadata> {
   const theme = await getBrandTheme();
-  // Favicon always uses our default icon so it never breaks (theme logo can be external/broken).
-  const iconUrl = DEFAULT_ICON;
-  const ogImage = theme.logoUrl && theme.logoUrl.startsWith("http") ? theme.logoUrl : iconUrl;
+  const iconUrl = theme.logoUrl ?? DEFAULT_ICON;
   return {
     metadataBase: new URL(SITE_URL),
     title: {
-      default: "Keldatagh | Buy Cheap Data Bundles in Ghana",
-      template: "%s | Keldatagh"
+      default: "GhBundle | Buy Cheap Data Bundles in Ghana",
+      template: "%s | GhBundle"
     },
     description: "Buy cheap data bundles in Ghana. Instant MTN, Telecel, AirtelTigo top ups with secure payments and rewards.",
     keywords: [
@@ -30,29 +28,26 @@ export async function generateMetadata(): Promise<Metadata> {
       "AirtelTigo data",
       "data bundle",
       "buy data online",
-      "Keldatagh"
+      "GhBundle"
     ],
     alternates: {
       canonical: "/"
     },
     openGraph: {
-      title: "Keldatagh | Buy Cheap Data Bundles in Ghana",
+      title: "GhBundle | Buy Cheap Data Bundles in Ghana",
       description: "Instant data bundle purchases in Ghana with fast delivery and secure payments.",
       url: SITE_URL,
-      siteName: "Keldatagh",
-      images: [ogImage],
+      siteName: "GhBundle",
+      images: [iconUrl],
       type: "website"
     },
     twitter: {
       card: "summary_large_image",
-      title: "Keldatagh | Buy Cheap Data Bundles in Ghana",
+      title: "GhBundle | Buy Cheap Data Bundles in Ghana",
       description: "Instant data bundle purchases in Ghana with fast delivery and secure payments.",
-      images: [ogImage]
+      images: [iconUrl]
     },
-    icons: {
-      icon: iconUrl,
-      apple: iconUrl
-    }
+    icons: { icon: iconUrl, apple: iconUrl }
   };
 }
 

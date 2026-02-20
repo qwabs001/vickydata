@@ -1,1 +1,1 @@
-postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
+postgresql://postgres.ryxxamwxeskfvojltfdt:ZUNEJz6gyFNaEHsA@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require&connection_limit=1&pgbouncer=true

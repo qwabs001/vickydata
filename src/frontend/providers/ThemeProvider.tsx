@@ -93,13 +93,12 @@ const applyPrimary = (primary: string) => {
   document.documentElement.style.setProperty("--primary-rgb", `${r} ${g} ${b}`);
 };
 
-const DEFAULT_FAVICON = "/images/networks/keldatagh.png";
+const DEFAULT_FAVICON = "/images/networks/ghbundlw.png?v=2";
 
 const applyBrandIcon = (logoUrl?: string) => {
   if (typeof document === "undefined") return;
+  const href = logoUrl || DEFAULT_FAVICON;
   const head = document.head;
-  // Use theme logo for favicon only when it's same-origin (reliable). Otherwise use default so tab icon never breaks.
-  const href = logoUrl?.startsWith("/") ? logoUrl : DEFAULT_FAVICON;
   const rels = ["icon", "apple-touch-icon"];
   rels.forEach((rel) => {
     let link = head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
@@ -140,7 +139,10 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
       const stored = loadThemeSettings();
       const nextAccent = data.accent ?? stored.accent;
       const nextPrimary = data.primary ?? stored.primary;
-      const nextLogo = data.logoUrl ?? stored.logoUrl ?? "";
+      const hasLogoKey = Object.prototype.hasOwnProperty.call(data, "logoUrl");
+      const nextLogo = hasLogoKey
+        ? (typeof data.logoUrl === "string" ? data.logoUrl.trim() : "")
+        : (stored.logoUrl ?? "");
       setAccentState(nextAccent);
       setPrimaryState(nextPrimary);
       setLogoUrlState(nextLogo || undefined);
@@ -203,7 +205,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
   const setLogoUrl = useCallback((url: string) => {
     const next = url?.trim();
     setLogoUrlState(next || undefined);
-    saveThemeSettings({ logoUrl: next || undefined });
+    saveThemeSettings({ logoUrl: next ?? undefined });
     applyBrandIcon(next || undefined);
   }, []);
 
