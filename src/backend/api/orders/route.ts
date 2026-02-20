@@ -25,6 +25,14 @@ export async function GET(request: Request) {
       }
     }
 
+    // Test database connection first
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (dbError) {
+      console.error("Database connection test failed:", dbError);
+      return NextResponse.json({ error: "Database connection failed." }, { status: 503 });
+    }
+
     // When fetching by userId, allow only that user or an admin
     if (scope !== "all" && userId) {
       const requesterId = request.headers.get("x-user-id");
@@ -64,13 +72,21 @@ export async function GET(request: Request) {
         include: {
           network: true,
           dataPlan: true,
-          user: scope === "all"
+          user: scope === "all" ? { select: { id: true, username: true, phoneNumber: true } } : false
         },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
         skip
+      }).catch((err) => {
+        console.error("Prisma order.findMany error:", err);
+        throw err;
       }),
-      shouldPaginate ? prisma.order.count({ where: whereClause }) : Promise.resolve(null)
+      shouldPaginate
+        ? prisma.order.count({ where: whereClause }).catch((err) => {
+            console.error("Prisma order.count error:", err);
+            throw err;
+          })
+        : Promise.resolve(null)
     ]);
 
     const cacheForCustomer = scope !== "all" ? "private, max-age=10, stale-while-revalidate=20" : undefined;
@@ -127,7 +143,13 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error("Order fetch error:", error);
-    return NextResponse.json({ error: "Unable to fetch orders." }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Order fetch error details:", { errorMessage, errorStack, scope, userId });
+    return NextResponse.json(
+      { error: "Unable to fetch orders.", details: process.env.NODE_ENV === "development" ? errorMessage : undefined },
+      { status: 500 }
+    );
   }
 }
 

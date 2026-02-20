@@ -8,6 +8,14 @@ export async function GET(request: Request) {
     if (!auth.ok) {
       return auth.response;
     }
+
+    // Test database connection first
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (dbError) {
+      console.error("Database connection test failed:", dbError);
+      return NextResponse.json({ error: "Database connection failed." }, { status: 503 });
+    }
     const { searchParams } = new URL(request.url);
     const roleParam = (searchParams.get("role") ?? "CUSTOMER").toUpperCase();
     const roleFilter =
@@ -25,6 +33,9 @@ export async function GET(request: Request) {
       },
       orderBy: { createdAt: "desc" },
       take: limitParam
+    }).catch((err) => {
+      console.error("Prisma user.findMany error:", err);
+      throw err;
     });
 
     const userIds = users.map((user) => user.id);
@@ -61,6 +72,12 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("User list error:", error);
-    return NextResponse.json({ error: "Unable to fetch users." }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("User list error details:", { errorMessage, errorStack });
+    return NextResponse.json(
+      { error: "Unable to fetch users.", details: process.env.NODE_ENV === "development" ? errorMessage : undefined },
+      { status: 500 }
+    );
   }
 }
