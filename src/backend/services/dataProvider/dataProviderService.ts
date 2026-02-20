@@ -183,13 +183,27 @@ async function apiRequest<T>(
 
   if (!res.ok) {
     const text = await res.text();
+    const contentType = res.headers.get("content-type") || "";
+    const isHtml = contentType.includes("text/html") || text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<!doctype") || text.trim().startsWith("<html");
+    
     console.error("[apiRequest] Provider API error:", {
       status: res.status,
       statusText: res.statusText,
       url,
+      contentType,
+      isHtml,
       headers: Object.fromEntries(res.headers.entries()),
       body: text.slice(0, 500)
     });
+    
+    // If we got HTML back, it's likely a 404 page or wrong endpoint
+    if (isHtml && res.status === 404) {
+      const err = new Error(`Endpoint not found (404). The API endpoint "${path}" does not exist on "${baseUrl}". Check your base URL and endpoint configuration.`) as Error & { status?: number; body?: string };
+      err.status = res.status;
+      err.body = text;
+      throw err;
+    }
+    
     const err = new Error(`API error ${res.status}: ${text.slice(0, 500)}`) as Error & { status?: number; body?: string };
     err.status = res.status;
     err.body = text;
@@ -1141,7 +1155,15 @@ export const dataProviderService = {
       // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
       const testPath = endpoints.test ?? (isGhBundle ? "/balance" : (isV1Provider(config) ? "/normal-orders" : "/"));
 
-      console.log("[testConnection] Testing:", { baseUrl: config.baseUrl, testPath, isGhBundle, hasApiKey: Boolean(config.apiKey) });
+      const fullUrl = getUrl(config.baseUrl, testPath);
+      console.log("[testConnection] Testing:", { 
+        baseUrl: config.baseUrl, 
+        testPath, 
+        fullUrl,
+        isGhBundle, 
+        hasApiKey: Boolean(config.apiKey),
+        customTestEndpoint: Boolean(endpoints.test)
+      });
 
       const result = await apiRequest(config.baseUrl, testPath, {
         method: "GET",
@@ -1153,9 +1175,20 @@ export const dataProviderService = {
     } catch (err) {
       console.error("[testConnection] Error:", err);
       const status = (err as { status?: number })?.status;
+      const errBody = (err as { body?: string })?.body || "";
+      const isHtmlError = errBody.trim().startsWith("<!DOCTYPE") || errBody.trim().startsWith("<!doctype") || errBody.trim().startsWith("<html");
+      
       if (status === 401 || status === 403) {
         return { ok: false, message: "Authentication failed. Check your API token." };
       }
+      
+      if (status === 404 && isHtmlError) {
+        return { 
+          ok: false, 
+          message: `Endpoint not found (404). The test endpoint does not exist on your API. For GhBundle APIs, use base URL: https://ghbundle.com/api/v1. If using a different provider, configure a custom test endpoint in Settings > API Configuration.` 
+        };
+      }
+      
       const msg = err instanceof Error ? err.message : "Unknown error";
       return { ok: false, message: `Connection failed: ${msg}` };
     }
