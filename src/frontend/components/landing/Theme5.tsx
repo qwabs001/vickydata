@@ -179,7 +179,7 @@ const Theme5: React.FC = () => {
 
   const handleStartNow = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    router.push("/signin");
+    router.push("/signin?mode=signup");
   };
 
   const handleNavigation = (e: React.MouseEvent<HTMLButtonElement>, url: string) => {
@@ -194,7 +194,7 @@ const Theme5: React.FC = () => {
     if (!isAuthenticated || !user?.id) {
       setCheckoutState("error");
       setCheckoutMessage("Please login first to complete payment and create order.");
-      router.push("/signin");
+      router.push("/signin?mode=login");
       return;
     }
 
@@ -316,7 +316,12 @@ const Theme5: React.FC = () => {
           <div className="hidden items-center gap-3 md:flex">
             <button
               type="button"
-              onClick={(e) => handleNavigation(e, isAuthenticated ? getDefaultRouteForRole(user?.role) : "/signin")}
+              onClick={(e) =>
+                handleNavigation(
+                  e,
+                  isAuthenticated ? getDefaultRouteForRole(user?.role) : "/signin?mode=login"
+                )
+              }
               className="rounded-full px-4 py-2 text-sm font-semibold text-[#1a1610] transition-colors hover:bg-[#ebe6dc]"
             >
               {isAuthenticated ? "Dashboard" : "Login"}
@@ -346,14 +351,14 @@ const Theme5: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={(e) => handleNavigation(e, "/signin")}
+                onClick={(e) => handleNavigation(e, "/signin?mode=login")}
                 className="rounded-xl border border-[#ddd4c6] bg-white px-3 py-2 text-sm font-semibold text-[#1b1710]"
               >
                 Login
               </button>
               <button
                 type="button"
-                onClick={(e) => handleNavigation(e, "/signin")}
+                onClick={(e) => handleNavigation(e, "/signin?mode=signup")}
                 className="rounded-xl px-3 py-2 text-sm font-bold text-[#16120b]"
                 style={{ backgroundColor: primaryColor }}
               >
