@@ -49,6 +49,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+const DEFAULT_BRAND_LOGO = "/images/networks/keldatagh.png";
 
 const normalizeHex = (value: string, fallback = DEFAULT_ACCENT) => {
   const trimmed = value.trim();
@@ -94,7 +95,8 @@ const applyPrimary = (primary: string) => {
 };
 
 const applyBrandIcon = (logoUrl?: string) => {
-  if (typeof document === "undefined" || !logoUrl) return;
+  if (typeof document === "undefined") return;
+  const href = (logoUrl ?? "").trim() || DEFAULT_BRAND_LOGO;
   const head = document.head;
   const rels = ["icon", "apple-touch-icon"];
   rels.forEach((rel) => {
@@ -104,8 +106,13 @@ const applyBrandIcon = (logoUrl?: string) => {
       link.rel = rel;
       head.appendChild(link);
     }
-    link.href = logoUrl;
+    link.href = href;
   });
+};
+
+const resolveLogoUrl = (logoUrl?: string | null) => {
+  const trimmed = (logoUrl ?? "").trim();
+  return trimmed || DEFAULT_BRAND_LOGO;
 };
 
 interface ThemeProviderProps {
@@ -121,7 +128,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
     () => initialTheme?.primary ?? loadThemeSettings().primary ?? DEFAULT_PRIMARY
   );
   const [logoUrl, setLogoUrlState] = useState<string | undefined>(
-    () => initialTheme?.logoUrl ?? undefined
+    () => resolveLogoUrl(initialTheme?.logoUrl ?? loadThemeSettings().logoUrl)
   );
   const [footer, setFooterState] = useState<FooterSettings>({});
   const [contact, setContactState] = useState<ContactSettings>({});
@@ -136,17 +143,17 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
       const stored = loadThemeSettings();
       const nextAccent = data.accent ?? stored.accent;
       const nextPrimary = data.primary ?? stored.primary;
-      const nextLogo = data.logoUrl ?? stored.logoUrl ?? "";
+      const nextLogo = resolveLogoUrl(data.logoUrl ?? stored.logoUrl);
       setAccentState(nextAccent);
       setPrimaryState(nextPrimary);
-      setLogoUrlState(nextLogo || undefined);
+      setLogoUrlState(nextLogo);
       applyAccent(nextAccent);
       applyPrimary(nextPrimary);
-      applyBrandIcon(nextLogo || undefined);
+      applyBrandIcon(nextLogo);
       saveThemeSettings({
         accent: nextAccent,
         primary: nextPrimary,
-        logoUrl: nextLogo || ""
+        logoUrl: nextLogo
       });
       if (data.footer) setFooterState(data.footer);
       if (data.contact) setContactState(data.contact);
@@ -197,10 +204,10 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
   }, []);
 
   const setLogoUrl = useCallback((url: string) => {
-    const next = url?.trim();
-    setLogoUrlState(next || undefined);
-    saveThemeSettings({ logoUrl: next || undefined });
-    applyBrandIcon(next || undefined);
+    const next = resolveLogoUrl(url);
+    setLogoUrlState(next);
+    saveThemeSettings({ logoUrl: next });
+    applyBrandIcon(next);
   }, []);
 
   const resetAccent = useCallback(() => {

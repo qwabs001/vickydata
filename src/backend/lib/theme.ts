@@ -3,6 +3,7 @@ import { prisma } from "@/backend/lib/db/prisma";
 
 const LOGO_KEY = "brand.logo";
 const THEME_KEY = "brand.theme";
+const DEFAULT_LOGO_URL = "/images/networks/keldatagh.png";
 
 export const DEFAULT_ACCENT = "#f6c500";
 export const DEFAULT_PRIMARY = "#2563eb";
@@ -10,7 +11,7 @@ export const DEFAULT_PRIMARY = "#2563eb";
 export type BrandTheme = {
   accent: string;
   primary: string;
-  logoUrl: string | null;
+  logoUrl: string;
 };
 
 export function hexToRgbString(hex: string): string {
@@ -42,14 +43,14 @@ export const getBrandTheme = cache(async (): Promise<BrandTheme> => {
     return {
       accent: themeValue?.accent ?? DEFAULT_ACCENT,
       primary: themeValue?.primary ?? DEFAULT_PRIMARY,
-      logoUrl: logoValue?.logoUrl ?? null
+      logoUrl: (logoValue?.logoUrl ?? "").trim() || DEFAULT_LOGO_URL
     };
   } catch (error) {
     console.error("Brand theme fetch error:", error);
     return {
       accent: DEFAULT_ACCENT,
       primary: DEFAULT_PRIMARY,
-      logoUrl: null
+      logoUrl: DEFAULT_LOGO_URL
     };
   }
 });
