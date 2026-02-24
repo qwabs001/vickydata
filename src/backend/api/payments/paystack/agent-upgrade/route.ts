@@ -53,12 +53,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // Ensure we send a valid email format to Paystack
+    let userEmail = user.fullName || user.username || user.phoneNumber || "customer";
+    if (!userEmail.includes("@")) {
+      const localPart = userEmail.replace(/[^a-zA-Z0-9._+-]/g, "").toLowerCase();
+      userEmail = `${localPart || "customer"}@keldatagh.com`;
+    }
+
     // Initialize Paystack payment (callback_url = where to redirect user after payment)
     const paymentResult = await paystackService.initializePayment({
       orderId: userId, // Using userId as orderId for agent upgrade
       orderNumber: ref,
       amount,
-      email: user.fullName || user.username || `${user.phoneNumber}@keldatagh.com`,
+      email: userEmail,
       callbackUrl: returnUrl,
       secretKey
     });
