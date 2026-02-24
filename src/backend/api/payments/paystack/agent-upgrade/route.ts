@@ -53,12 +53,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Ensure we send a valid email format to Paystack
-    let userEmail = user.fullName || user.username || user.phoneNumber || "customer";
-    if (!userEmail.includes("@")) {
-      const localPart = userEmail.replace(/[^a-zA-Z0-9._+-]/g, "").toLowerCase();
-      userEmail = `${localPart || "customer"}@keldatagh.com`;
-    }
+    // Paystack requires email; use a fixed valid fallback for agent upgrade flow
+    const userEmail = "customer@keldatagh.com";
 
     // Initialize Paystack payment (callback_url = where to redirect user after payment)
     const paymentResult = await paystackService.initializePayment({
