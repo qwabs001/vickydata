@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import SignInPageClient from "@/frontend/app/signin/page";
 
 export const metadata: Metadata = {
   title: "Sign In",
@@ -6,4 +8,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/signin" }
 };
 
-export { default } from "@/frontend/app/signin/page";
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f5f3ef]" />}>
+      <SignInPageClient />
+    </Suspense>
+  );
+}
