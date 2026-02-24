@@ -1,4 +1,19 @@
 const PAYSTACK_URL = "https://api.paystack.co";
+const FALLBACK_PAYSTACK_EMAIL = "customer@keldatagh.com";
+
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const resolvePaystackEmail = (value?: string | null) => {
+  const candidate = (value ?? "").trim().toLowerCase();
+  if (isValidEmail(candidate)) return candidate;
+
+  const localPart = candidate
+    .replace(/[^a-z0-9._+-]/g, "")
+    .replace(/^[._+-]+|[._+-]+$/g, "")
+    .slice(0, 64);
+
+  return localPart ? `${localPart}@keldatagh.com` : FALLBACK_PAYSTACK_EMAIL;
+};
 
 export const paystackService = {
   async initializePayment(params: {
@@ -17,6 +32,8 @@ export const paystackService = {
       throw new Error("Paystack secret key not configured. Please configure Paystack in Admin → Payment Settings.");
     }
 
+    const safeEmail = resolvePaystackEmail(params.email);
+
     try {
       const res = await fetch(`${PAYSTACK_URL}/transaction/initialize`, {
         method: "POST",
@@ -26,7 +43,7 @@ export const paystackService = {
         },
         body: JSON.stringify({
           amount: Math.round(params.amount * 100),
-          email: params.email ?? "customer@keldatagh.com",
+          email: safeEmail,
           reference,
           metadata: {
             orderId: params.orderId,
