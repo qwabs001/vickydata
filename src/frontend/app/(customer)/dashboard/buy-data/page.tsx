@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { DataPlanCards } from "@/frontend/components/landing/DataPlanCards";
 import { NetworkSelector } from "@/frontend/components/landing/NetworkSelector";
 import { PhoneNumberInput } from "@/frontend/components/landing/PhoneNumberInput";
@@ -16,13 +17,15 @@ import type { DataPlan, Network } from "@/shared/types";
 import { formatCurrency, formatGhanaPhone } from "@/shared/utils/formatters";
 import { isValidGhanaPhone } from "@/shared/utils/validators";
 
+const digitsOnly = (value: string) => value.replace(/\D/g, "");
+
 export default function BuyDataPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const { networks } = useNetworks();
   const [selectedNetwork, setSelectedNetwork] = useState<Network | null>(null);
-  const { plans } = useDataPlans(selectedNetwork?.id, selectedNetwork?.name);
+  const { plans, loading: plansLoading } = useDataPlans(selectedNetwork?.id, selectedNetwork?.name);
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +43,7 @@ export default function BuyDataPage() {
   const quickPlanId = useMemo(() => searchParams.get("planId"), [searchParams]);
   const quickNetworkId = useMemo(() => searchParams.get("networkId"), [searchParams]);
   const quickPhone = useMemo(() => searchParams.get("phone"), [searchParams]);
+  const activePlans = useMemo(() => plans.filter((plan) => plan.isActive), [plans]);
 
   const rewardEligible = rewardsBalance.currentBalance >= 50;
   const rewardToApply = useMemo(() => {
@@ -62,17 +66,31 @@ export default function BuyDataPage() {
   }, [rewardEligible]);
 
   useEffect(() => {
-    if (!quickNetworkId || selectedNetwork || networks.length === 0) return;
-    const match = networks.find((network) => network.id === quickNetworkId);
-    if (match) setSelectedNetwork(match);
+    if (selectedNetwork || networks.length === 0) return;
+    const match = quickNetworkId ? networks.find((network) => network.id === quickNetworkId) : null;
+    setSelectedNetwork(match || networks[0] || null);
   }, [networks, quickNetworkId, selectedNetwork]);
 
   useEffect(() => {
-    if (!quickPlanId || !plans.length) return;
-    if (selectedPlan?.id === quickPlanId) return;
-    const match = plans.find((plan) => plan.id === quickPlanId);
-    if (match) setSelectedPlan(match);
-  }, [plans, quickPlanId, selectedPlan]);
+    if (!activePlans.length) {
+      setSelectedPlan(null);
+      return;
+    }
+
+    if (quickPlanId) {
+      if (selectedPlan?.id === quickPlanId) return;
+      const match = activePlans.find((plan) => plan.id === quickPlanId);
+      if (match) {
+        setSelectedPlan(match);
+        return;
+      }
+    }
+
+    setSelectedPlan((current) => {
+      if (current && activePlans.some((plan) => plan.id === current.id)) return current;
+      return activePlans[0];
+    });
+  }, [activePlans, quickPlanId, selectedPlan]);
 
   useEffect(() => {
     if (!quickPhone || phoneNumber) return;
@@ -90,6 +108,8 @@ export default function BuyDataPage() {
       document.body.classList.remove("hide-mobile-nav");
     };
   }, [showWalletModal]);
+
+  const selectedNetworkName = selectedNetwork?.displayName || selectedNetwork?.name || "Select network";
 
   const handlePayNow = async () => {
     if (!user?.id) {
@@ -118,10 +138,10 @@ export default function BuyDataPage() {
             userId: user.id,
             networkId: selectedNetwork.id,
             dataPlanId: selectedPlan.id,
-            recipientNumber: phoneNumber,
+            recipientNumber: digitsOnly(phoneNumber),
             rewardToUse: rewardToApply,
-            useWallet: true
-          })
+            useWallet: true,
+          }),
         });
         const orderData = await orderResponse.json().catch(() => null);
         if (!orderResponse.ok) {
@@ -142,7 +162,7 @@ export default function BuyDataPage() {
 
     const ref = `ORDER-${user.id}-${Date.now()}`;
     try {
-      const response = await fetch("/api/payments/moolre/initialize", {
+      const response = await fetch("/api/payments/paystack/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -153,10 +173,10 @@ export default function BuyDataPage() {
           type: "order",
           networkId: selectedNetwork.id,
           dataPlanId: selectedPlan.id,
-          recipientNumber: phoneNumber,
+          recipientNumber: digitsOnly(phoneNumber),
           rewardToUse: rewardToApply,
-          useWallet: false
-        })
+          useWallet: false,
+        }),
       });
       const data = await response.json().catch(() => null);
       if (data?.error) {
@@ -187,7 +207,7 @@ export default function BuyDataPage() {
     setWalletNotice(null);
     try {
       const ref = `WALLET-${user.id}-${Date.now()}`;
-      const response = await fetch("/api/payments/moolre/initialize", {
+      const response = await fetch("/api/payments/paystack/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -195,8 +215,8 @@ export default function BuyDataPage() {
           amount,
           currency: "GHS",
           ref,
-          type: "wallet"
-        })
+          type: "wallet",
+        }),
       });
       const data = await response.json().catch(() => null);
       if (data?.error) {
@@ -217,7 +237,7 @@ export default function BuyDataPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[960px] flex-col gap-6 pt-2 md:pt-6">
+    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 pt-2 md:pt-6">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-2">
           <Link
@@ -269,11 +289,11 @@ export default function BuyDataPage() {
           </span>
           <h2 className="text-base font-bold text-slate-900 md:text-xl">Choose Plan</h2>
         </div>
-        <DataPlanCards
-          plans={plans}
-          selectedId={selectedPlan?.id}
-          onSelect={setSelectedPlan}
-        />
+        {plansLoading ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">Loading plans...</div>
+        ) : (
+          <DataPlanCards plans={activePlans} selectedId={selectedPlan?.id} onSelect={setSelectedPlan} />
+        )}
       </section>
 
       <section className="grid gap-4 md:grid-cols-[2fr_1fr]">
@@ -291,20 +311,14 @@ export default function BuyDataPage() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Order Summary</p>
-          <p className="mt-2 text-lg font-black text-slate-900">
-            {formatCurrency(payableAmount, selectedPlan?.currency ?? "GHS")}
-          </p>
+          <p className="mt-2 text-lg font-black text-slate-900">{formatCurrency(payableAmount, selectedPlan?.currency ?? "GHS")}</p>
           <p className="mt-1 text-xs text-slate-500">
-            {selectedPlan ? `${selectedPlan.dataAmount} • ${selectedNetwork?.name ?? ""}` : "Select a plan"}
+            {selectedPlan ? `${selectedPlan.dataAmount} • ${selectedNetworkName}` : "Select a plan"}
           </p>
 
           <div className="mt-4 flex flex-col gap-2">
             <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600">
-              <input
-                type="checkbox"
-                checked={useWalletBalance}
-                onChange={(event) => setUseWalletBalance(event.target.checked)}
-              />
+              <input type="checkbox" checked={useWalletBalance} onChange={(event) => setUseWalletBalance(event.target.checked)} />
               Use Wallet
             </label>
             <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600">
@@ -323,9 +337,7 @@ export default function BuyDataPage() {
           </p>
 
           {error ? (
-            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              {error}
-            </p>
+            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
           ) : null}
 
           <button
@@ -334,9 +346,14 @@ export default function BuyDataPage() {
             onClick={handlePayNow}
             disabled={isPaying}
           >
-            {isPaying
-              ? "Processing..."
-              : `Pay ${formatCurrency(payableAmount, selectedPlan?.currency ?? "GHS")}`}
+            {isPaying ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                Processing...
+              </span>
+            ) : (
+              `Pay ${formatCurrency(payableAmount, selectedPlan?.currency ?? "GHS")}`
+            )}
           </button>
         </div>
       </section>
@@ -344,11 +361,9 @@ export default function BuyDataPage() {
       <Dialog open={showWalletModal} onClose={() => setShowWalletModal(false)} mobileBottomSheet>
         <div className="p-6">
           <h3 className="text-lg font-semibold text-slate-900">Add Wallet Funds</h3>
-          <p className="mt-1 text-sm text-slate-500">You will be redirected to Moolre to complete payment.</p>
+          <p className="mt-1 text-sm text-slate-500">You will be redirected to Paystack to complete payment.</p>
           {walletNotice ? (
-            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {walletNotice}
-            </p>
+            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{walletNotice}</p>
           ) : null}
           <div className="mt-4 space-y-2">
             <label className="text-sm font-semibold text-slate-700">Amount (GHS)</label>
