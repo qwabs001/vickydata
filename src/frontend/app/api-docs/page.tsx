@@ -485,7 +485,7 @@ limit=10          (optional) Limit results`,
         params: `userId=xxx        (required) The user ID`,
         responseBody: `{
   "referralCode": "abc123",
-  "referralLink": "https://ghbundle.com?ref=abc123"
+  "referralLink": "https://keldatagh.com?ref=abc123"
 }`
       }
     ]
@@ -504,13 +504,13 @@ limit=10          (optional) Limit results`,
           "Create a webhook subscription. Use header X-API-KEY: YOUR_PUBLIC_KEY. Callback URL must be HTTPS.",
         auth: true,
         requestBody: `{
-  "url": "https://your-site.com/api/ghbundle/webhook",
+  "url": "https://your-site.com/api/keldatagh/webhook",
   "events": ["order.updated"],
   "secret": "your_webhook_secret"
 }`,
         responseBody: `{
   "id": "wh_123",
-  "url": "https://your-site.com/api/ghbundle/webhook",
+  "url": "https://your-site.com/api/keldatagh/webhook",
   "events": ["order.updated"],
   "enabled": true,
   "created_at": "2026-02-20T12:00:00.000Z"
@@ -526,7 +526,7 @@ limit=10          (optional) Limit results`,
   "webhooks": [
     {
       "id": "wh_123",
-      "url": "https://your-site.com/api/ghbundle/webhook",
+      "url": "https://your-site.com/api/keldatagh/webhook",
       "events": ["order.updated"],
       "enabled": true,
       "created_at": "2026-02-20T12:00:00.000Z",
@@ -690,7 +690,7 @@ export default function ApiDocsPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <div>
             <Link href="/" className="text-lg font-black text-[#0f172a]">
-              GhBundle
+              Keldatagh
             </Link>
             <span className="ml-3 rounded-full bg-[#2563eb] px-3 py-0.5 text-[11px] font-bold text-white">
               API Docs
@@ -715,7 +715,7 @@ export default function ApiDocsPage() {
         <div className="mb-10">
           <h1 className="text-3xl font-black text-[#0f172a]">API Reference</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-500">
-            GhBundle provides a RESTful API for integrating data bundle purchases, wallet management, and
+            Keldatagh provides a RESTful API for integrating data bundle purchases, wallet management, and
             rewards into your applications. All responses are JSON.
           </p>
         </div>
@@ -726,7 +726,7 @@ export default function ApiDocsPage() {
             <div>
               <h3 className="text-sm font-bold text-slate-900">Base URL</h3>
               <code className="mt-2 block rounded-xl bg-slate-900 px-4 py-3 text-sm text-emerald-400">
-                https://ghbundle.com/api
+                https://keldatagh.com/api
               </code>
             </div>
             <div>
@@ -908,7 +908,7 @@ X-API-KEY: YOUR_PUBLIC_KEY`}</pre>
       {/* ── Footer ── */}
       <footer className="mt-12 border-t border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-8 text-center text-xs text-slate-400">
-          &copy; {new Date().getFullYear()} GhBundle. All rights reserved.
+          &copy; {new Date().getFullYear()} Keldatagh. All rights reserved.
         </div>
       </footer>
     </div>

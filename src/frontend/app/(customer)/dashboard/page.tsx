@@ -553,7 +553,7 @@ export default function CustomerDashboardPage() {
           <div>
             <h1 className="text-2xl font-black text-slate-900">Customer Rewards</h1>
             <p className="text-sm text-slate-500">
-              Track and manage your GhBundle earnings
+              Track and manage your Keldatagh earnings
             </p>
           </div>
           <div className="flex items-center gap-3">
