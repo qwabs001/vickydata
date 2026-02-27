@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/backend/lib/db/prisma";
+import { withNotificationStorageRecovery } from "@/backend/lib/db/notificationStorage";
 import { requireAdmin } from "@/backend/lib/middleware/admin";
 
 const createSchema = z.object({
@@ -15,10 +16,12 @@ export async function GET(request: Request) {
     const auth = await requireAdmin(request);
     if (!auth.ok) return auth.response;
 
-    const notifications = await prisma.notification.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { _count: { select: { reads: true } } }
-    });
+    const notifications = await withNotificationStorageRecovery(() =>
+      prisma.notification.findMany({
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { reads: true } } }
+      })
+    );
 
     return NextResponse.json(
       notifications.map((n) => ({
@@ -54,15 +57,25 @@ export async function POST(request: Request) {
 
     const userId = request.headers.get("x-user-id");
 
-    const notification = await prisma.notification.create({
-      data: {
-        type: parsed.data.type,
-        title: parsed.data.title,
-        content: parsed.data.content,
-        isActive: parsed.data.isActive ?? true,
-        createdBy: userId
-      }
-    });
+    const notification = await withNotificationStorageRecovery(() =>
+      prisma.notification.create({
+        data: {
+          type: parsed.data.type,
+          title: parsed.data.title,
+          content: parsed.data.content,
+          isActive: parsed.data.isActive ?? true,
+          createdBy: userId
+        },
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          content: true,
+          isActive: true,
+          createdAt: true
+        }
+      })
+    );
 
     return NextResponse.json({
       id: notification.id,

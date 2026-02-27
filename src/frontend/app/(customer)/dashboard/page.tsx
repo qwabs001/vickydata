@@ -314,7 +314,7 @@ export default function CustomerDashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          amount: 300,
+          amount: 100,
           currency: "GHS",
           ref
         })
@@ -877,7 +877,7 @@ export default function CustomerDashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Upgrade to Agent</h3>
-              <p className="mt-1 text-sm text-slate-500">One-time activation fee: GH₵300.00</p>
+              <p className="mt-1 text-sm text-slate-500">One-time activation fee: GH₵100.00</p>
             </div>
             <button
               type="button"

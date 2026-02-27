@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/backend/lib/db/prisma";
+import { withNotificationStorageRecovery } from "@/backend/lib/db/notificationStorage";
 import { requireAdmin } from "@/backend/lib/middleware/admin";
 
 const updateSchema = z.object({
@@ -28,15 +29,19 @@ export async function PATCH(
       );
     }
 
-    const existing = await prisma.notification.findUnique({ where: { id } });
+    const existing = await withNotificationStorageRecovery(() =>
+      prisma.notification.findUnique({ where: { id } })
+    );
     if (!existing) {
       return NextResponse.json({ error: "Notification not found." }, { status: 404 });
     }
 
-    const notification = await prisma.notification.update({
-      where: { id },
-      data: parsed.data
-    });
+    const notification = await withNotificationStorageRecovery(() =>
+      prisma.notification.update({
+        where: { id },
+        data: parsed.data
+      })
+    );
 
     return NextResponse.json({
       id: notification.id,
@@ -62,7 +67,9 @@ export async function DELETE(
     if (!auth.ok) return auth.response;
 
     const { id } = await context.params;
-    await prisma.notification.delete({ where: { id } });
+    await withNotificationStorageRecovery(() =>
+      prisma.notification.delete({ where: { id } })
+    );
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Notification delete error:", error);

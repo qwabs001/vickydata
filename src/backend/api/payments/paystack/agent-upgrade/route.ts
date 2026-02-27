@@ -12,7 +12,7 @@ const bodySchema = z.object({
   ref: z.string().min(1)
 });
 
-const AGENT_UPGRADE_FEE = 300;
+const AGENT_UPGRADE_FEE = 100;
 
 export async function POST(request: Request) {
   try {
