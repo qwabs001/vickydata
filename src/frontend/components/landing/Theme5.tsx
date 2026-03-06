@@ -68,6 +68,13 @@ const resolveNetworkKeyFromText = (value?: string | null): DataBundleNetworkKey 
 const digitsOnly = (value: string) => value.replace(/\D/g, "");
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function parsePlanSizeInGb(plan: DataPlan): number | null {
+  const source = plan.dataAmount || plan.name || "";
+  const match = source.trim().match(/^(\d+(?:\.\d+)?)\s*gb$/i);
+  if (!match) return null;
+  return Number(match[1]);
+}
+
 const Theme5: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,6 +88,7 @@ const Theme5: React.FC = () => {
   const [logoFailed, setLogoFailed] = useState(false);
   const [selectedNetworkKey, setSelectedNetworkKey] = useState<DataBundleNetworkKey | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
+  const [showAllPlans, setShowAllPlans] = useState(false);
   const [recipientNumber, setRecipientNumber] = useState("");
   const [checkoutState, setCheckoutState] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [checkoutMessage, setCheckoutMessage] = useState("");
@@ -181,6 +189,17 @@ const Theme5: React.FC = () => {
     return plans.filter((plan) => plan.networkId === selectedNetworkCard.networkId && plan.isActive);
   }, [selectedNetworkCard, plans]);
 
+  const initialVisiblePlans = useMemo(() => {
+    const limitedPlans = filteredPlans.filter((plan) => {
+      const sizeInGb = parsePlanSizeInGb(plan);
+      return sizeInGb !== null && sizeInGb >= 1 && sizeInGb <= 5;
+    });
+    return limitedPlans.length > 0 ? limitedPlans : filteredPlans.slice(0, 5);
+  }, [filteredPlans]);
+
+  const visiblePlans = showAllPlans ? filteredPlans : initialVisiblePlans;
+  const hasMorePlans = filteredPlans.length > initialVisiblePlans.length;
+
   useEffect(() => {
     if (filteredPlans.length === 0) {
       setSelectedPlan(null);
@@ -188,9 +207,13 @@ const Theme5: React.FC = () => {
     }
     setSelectedPlan((current) => {
       if (current && filteredPlans.some((plan) => plan.id === current.id)) return current;
-      return filteredPlans[0];
+      return initialVisiblePlans[0] || filteredPlans[0];
     });
-  }, [filteredPlans]);
+  }, [filteredPlans, initialVisiblePlans]);
+
+  useEffect(() => {
+    setShowAllPlans(false);
+  }, [selectedNetworkCard?.networkId]);
 
   const selectedNetworkName = selectedNetworkCard?.networkName || "Select network";
   const selectedBundleName = selectedPlan?.name || "Select package";
@@ -334,7 +357,7 @@ const Theme5: React.FC = () => {
 
     try {
       const ref = `ORDER-${user.id}-${Date.now()}`;
-      const response = await fetch("/api/payments/moolre/initialize", {
+      const response = await fetch("/api/payments/paystack/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -635,31 +658,45 @@ const Theme5: React.FC = () => {
 
               <p className="mt-5 text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">Choose Data Package</p>
               {filteredPlans.length > 0 ? (
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {filteredPlans.map((plan) => {
-                    const selected = selectedPlan?.id === plan.id;
-                    return (
+                <>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {visiblePlans.map((plan) => {
+                      const selected = selectedPlan?.id === plan.id;
+                      return (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => setSelectedPlan(plan)}
+                          className="flex items-center justify-between rounded-xl border bg-white px-4 py-3 text-left"
+                          style={{
+                            borderColor: selected ? primaryColor : "#e5ddcf",
+                            backgroundColor: selected ? primaryRgba(0.08) : "#ffffff",
+                          }}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-bold text-[#1d180f]">{plan.name}</span>
+                            <span className="block truncate text-xs text-[#8f836f]">{plan.dataAmount || plan.name}</span>
+                          </span>
+                          <span className="ml-3 text-sm font-extrabold" style={{ color: selected ? primaryColor : "#1d180f" }}>
+                            {formatCurrency(plan.price, plan.currency || "GHS")}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!showAllPlans && hasMorePlans ? (
+                    <div className="mt-4 flex justify-center">
                       <button
-                        key={plan.id}
                         type="button"
-                        onClick={() => setSelectedPlan(plan)}
-                        className="flex items-center justify-between rounded-xl border bg-white px-4 py-3 text-left"
-                        style={{
-                          borderColor: selected ? primaryColor : "#e5ddcf",
-                          backgroundColor: selected ? primaryRgba(0.08) : "#ffffff",
-                        }}
+                        onClick={() => setShowAllPlans(true)}
+                        className="rounded-full border px-5 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-[#1d180f] transition hover:opacity-90"
+                        style={{ borderColor: primaryColor, color: primaryColor }}
                       >
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-bold text-[#1d180f]">{plan.name}</span>
-                          <span className="block truncate text-xs text-[#8f836f]">{plan.dataAmount || plan.name}</span>
-                        </span>
-                        <span className="ml-3 text-sm font-extrabold" style={{ color: selected ? primaryColor : "#1d180f" }}>
-                          {formatCurrency(plan.price, plan.currency || "GHS")}
-                        </span>
+                        Load more
                       </button>
-                    );
-                  })}
-                </div>
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <div className="mt-3 rounded-xl border border-[#e5ddcf] bg-[#fbfaf8] px-4 py-4 text-sm text-[#746b5e]">
                   No data packages are assigned to this network yet.
