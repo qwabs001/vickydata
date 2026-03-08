@@ -34,29 +34,34 @@ function parseApiKey(input?: string): { raw: string; token: string; authorizatio
   };
 }
 
-function buildAuthHeaders(apiKey?: string, apiSecret?: string): Record<string, string> {
+function buildAuthHeaders(baseUrl: string, apiKey?: string, apiSecret?: string): Record<string, string> {
   const headers: Record<string, string> = {};
   const parsedKey = parseApiKey(apiKey);
+  const isGhBundle = isGhBundleBaseUrl(baseUrl);
   if (parsedKey.raw) {
     headers.Authorization = parsedKey.authorization;
-    headers["X-API-Key"] = parsedKey.token;
-    headers["X-Auth-Token"] = parsedKey.token;
-    headers["Api-Key"] = parsedKey.token;
+    headers["X-API-KEY"] = parsedKey.token;
+    if (!isGhBundle) {
+      headers["X-Auth-Token"] = parsedKey.token;
+      headers["Api-Key"] = parsedKey.token;
+    }
   }
   const secret = apiSecret?.trim() ?? "";
-  if (secret && secret !== parsedKey.token) {
+  if (!isGhBundle && secret && secret !== parsedKey.token) {
     headers["X-API-Secret"] = secret;
   }
   return headers;
 }
 
 function buildSignedHeaders(params: {
+  baseUrl: string;
   method: "GET" | "POST";
   path: string;
   body?: unknown;
   apiKey?: string;
   apiSecret?: string;
 }): Record<string, string> {
+  if (isGhBundleBaseUrl(params.baseUrl)) return {};
   const parsedKey = parseApiKey(params.apiKey);
   const secret = params.apiSecret?.trim() ?? "";
   if (!secret || secret === parsedKey.token) return {};
@@ -172,10 +177,11 @@ async function apiRequest<T>(
     "Content-Type": "application/json",
     Accept: "application/json"
   };
-  Object.assign(headers, buildAuthHeaders(options.apiKey, options.apiSecret));
+  Object.assign(headers, buildAuthHeaders(baseUrl, options.apiKey, options.apiSecret));
   Object.assign(
     headers,
     buildSignedHeaders({
+      baseUrl,
       method: options.method ?? "GET",
       path: signaturePath,
       body: options.body,

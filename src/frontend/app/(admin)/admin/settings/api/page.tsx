@@ -63,6 +63,23 @@ export default function Page() {
 
   const connected = configs.length > 0;
   const activeConfig = configs.find((c) => c.isActive);
+  const ghBundleMode = isGhBundleUrl(baseUrl);
+  const statusLabel = !activeConfig
+    ? "Not Connected"
+    : serviceStatus?.ok === true
+      ? "Connected"
+      : serviceStatus?.ok === false
+        ? "Needs Attention"
+        : "Configured";
+  const statusDotClass = !activeConfig
+    ? "bg-slate-300"
+    : serviceStatus?.ok === true
+      ? "bg-emerald-500"
+      : serviceStatus?.ok === false
+        ? "bg-red-500"
+        : activeConfig.isActive
+          ? "bg-amber-500"
+          : "bg-slate-300";
 
   const loadConfigs = async () => {
     if (!user?.id) return;
@@ -296,10 +313,10 @@ export default function Page() {
       {connected && activeConfig ? (
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Status</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Status</p>
             <div className="mt-3 flex items-center gap-2">
-              <span className={`h-3 w-3 rounded-full ${activeConfig.isActive ? "bg-emerald-500" : "bg-slate-300"}`} />
-              <span className="text-lg font-bold text-slate-900">{activeConfig.isActive ? "Connected" : "Inactive"}</span>
+              <span className={`h-3 w-3 rounded-full ${statusDotClass}`} />
+              <span className="text-lg font-bold text-slate-900">{statusLabel}</span>
             </div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
@@ -391,6 +408,9 @@ export default function Page() {
                 </button>
               </div>
               <p className="mt-1 text-xs text-slate-400">Paste your provider token (include a prefix like &quot;Token&quot; or &quot;Bearer&quot; if required).</p>
+              {ghBundleMode ? (
+                <p className="mt-1 text-xs text-[#2563eb]">GhBundle uses token auth. A valid API token is enough.</p>
+              ) : null}
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-widest text-slate-500">
@@ -433,7 +453,9 @@ export default function Page() {
                 </button>
               </div>
               <p className="mt-1 text-xs text-slate-400">
-                Leave empty to reuse API token as secret. Use this if your provider requires a separate signing secret.
+                {ghBundleMode
+                  ? "Leave this empty for GhBundle. Separate signing headers are not used for GhBundle API requests."
+                  : "Leave empty to reuse API token as secret. Use this if your provider requires a separate signing secret."}
               </p>
             </div>
             <button
