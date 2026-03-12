@@ -12,6 +12,65 @@ type EndpointsConfig = {
   purchaseMethod?: "GET" | "POST"; // HTTP method for purchase endpoint
 };
 
+const V1_PURCHASE_ENDPOINT_CANDIDATES = ["/normal-orders", "/orders", "/purchase", "/data-orders"];
+const V1_TEST_ENDPOINT_CANDIDATES = ["/services", "/balance", "/me", "/profile"];
+const V1_STATUS_ENDPOINT_TEMPLATES = [
+  "/orders/{reference}",
+  "/orders?reference={reference}",
+  "/normal-orders/{reference}",
+  "/normal-orders?reference={reference}"
+];
+const SERIALIZED_ACTIVE_ORDER_STATUSES = ["PENDING", "PROCESSING"] as const;
+
+function uniqueNonEmptyPaths(values: Array<string | undefined | null>): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+
+  return result;
+}
+
+function buildReferenceQueryTemplate(path: string): string {
+  return `${path}${path.includes("?") ? "&" : "?"}reference={reference}`;
+}
+
+function getV1PurchaseCandidatePaths(endpoints: EndpointsConfig): string[] {
+  return uniqueNonEmptyPaths([endpoints.purchase, ...V1_PURCHASE_ENDPOINT_CANDIDATES]);
+}
+
+function getV1StatusCandidateTemplates(endpoints: EndpointsConfig): string[] {
+  const purchaseCandidates = getV1PurchaseCandidatePaths(endpoints);
+  return uniqueNonEmptyPaths([
+    endpoints.status,
+    ...purchaseCandidates.map(buildReferenceQueryTemplate),
+    ...V1_STATUS_ENDPOINT_TEMPLATES
+  ]);
+}
+
+function getProviderTestCandidatePaths(config: ApiConfiguration, endpoints: EndpointsConfig): string[] {
+  if (isGhBundleBaseUrl(config.baseUrl)) {
+    return uniqueNonEmptyPaths([
+      resolveGhBundleEndpoint(endpoints.test, "/balance"),
+      resolveGhBundleEndpoint(endpoints.networks, "/services"),
+      resolveGhBundleEndpoint(endpoints.purchase, "/orders")
+    ]);
+  }
+
+  return uniqueNonEmptyPaths([
+    endpoints.test,
+    endpoints.networks,
+    endpoints.plans,
+    ...getV1PurchaseCandidatePaths(endpoints),
+    ...V1_TEST_ENDPOINT_CANDIDATES
+  ]);
+}
+
 function parseApiKey(input?: string): { raw: string; token: string; authorization: string } {
   const raw = input?.trim() ?? "";
   if (!raw) {
@@ -86,6 +145,100 @@ async function getActiveConfig(): Promise<ApiConfiguration | null> {
   return config;
 }
 
+async function getSerializedOrderContext(orderId: string) {
+  return prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      orderNumber: true,
+      recipientNumber: true,
+      networkId: true,
+      status: true,
+      paymentStatus: true,
+      createdAt: true,
+      dataPlan: {
+        select: {
+          dataInMB: true
+        }
+      }
+    }
+  });
+}
+
+async function findBlockingSerializedOrder(orderId: string) {
+  const order = await getSerializedOrderContext(orderId);
+  if (!order?.dataPlan) return null;
+
+  const activeOrders = await prisma.order.findMany({
+    where: {
+      recipientNumber: order.recipientNumber,
+      networkId: order.networkId,
+      paymentStatus: "COMPLETED",
+      status: { in: [...SERIALIZED_ACTIVE_ORDER_STATUSES] },
+      dataPlan: {
+        is: {
+          dataInMB: order.dataPlan.dataInMB
+        }
+      }
+    },
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      createdAt: true
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+  });
+
+  for (const candidate of activeOrders) {
+    if (candidate.id === orderId) {
+      return null;
+    }
+    return candidate;
+  }
+
+  return null;
+}
+
+async function findNextQueuedSerializedOrder(orderId: string) {
+  const order = await getSerializedOrderContext(orderId);
+  if (!order?.dataPlan) return null;
+
+  return prisma.order.findFirst({
+    where: {
+      id: { not: order.id },
+      recipientNumber: order.recipientNumber,
+      networkId: order.networkId,
+      paymentStatus: "COMPLETED",
+      status: "PENDING",
+      dataPlan: {
+        is: {
+          dataInMB: order.dataPlan.dataInMB
+        }
+      }
+    },
+    select: {
+      id: true,
+      orderNumber: true
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+  });
+}
+
+async function releaseNextQueuedSerializedOrder(orderId: string): Promise<void> {
+  const nextQueuedOrder = await findNextQueuedSerializedOrder(orderId);
+  if (!nextQueuedOrder) return;
+
+  try {
+    const result = await dataProviderService.fulfillOrder(nextQueuedOrder.id);
+    if (!result.ok) {
+      console.warn("[provider] Next queued order could not be fulfilled:", nextQueuedOrder.id, result.error);
+    }
+  } catch (error) {
+    console.error("[provider] Failed to release next queued order:", nextQueuedOrder.id, error);
+  }
+}
+
 function getUrl(baseUrl: string, path: string): string {
   const base = baseUrl.replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
@@ -150,6 +303,9 @@ function parseProviderError(err: unknown): string {
   }
   if (status === 401 || status === 403 || lower.includes("unauthorized") || lower.includes("forbidden") || (lower.includes("auth") && (lower.includes("fail") || lower.includes("invalid") || lower.includes("error")))) {
     return "Provider API authentication failed. Check your API key, API secret, and base URL in Settings > API Configuration.";
+  }
+  if (lower.includes("route") && lower.includes("could not be found")) {
+    return "Provider endpoint not found. Update the base URL or custom endpoint paths in Settings > API Configuration.";
   }
   if (isV1SizeVariantUnavailableMessage(providerMsg) || isV1SizeVariantUnavailableMessage(lower)) {
     return "Selected bundle size is unavailable on provider for this network. Use a plan size that exists in the provider catalog.";
@@ -1224,40 +1380,34 @@ async function fetchProviderOrderStatusPayload(
   }
 
   if (isV1Provider(config)) {
-    const purchasePath = endpoints.purchase ?? "/normal-orders";
-    if (providerReference) {
-      const pathWithReference = appendQuery(purchasePath, "reference", providerReference);
+    const statusTemplates = getV1StatusCandidateTemplates(endpoints);
+    for (const template of statusTemplates) {
+      const statusPath = buildStatusPath(template, {
+        reference: providerReference,
+        orderId: order.id,
+        orderNumber: order.orderNumber
+      });
+
       try {
-        const scopedPayload = await apiRequest<unknown>(config.baseUrl, pathWithReference, {
+        const payload = await apiRequest<unknown>(config.baseUrl, statusPath, {
           method: "GET",
           apiKey: config.apiKey,
           apiSecret: config.apiSecret ?? undefined
         });
-        const scopedMatch = findProviderEntryByReference(scopedPayload, [providerReference]);
-        if (scopedMatch) return scopedMatch;
-        if (!Array.isArray(scopedPayload)) return scopedPayload;
-      } catch {
-        // Continue with unscoped fallback
+        const matched = findProviderEntryByReference(payload, [
+          providerReference ?? "",
+          order.paymentReference ?? "",
+          order.orderNumber,
+          order.id
+        ]);
+        if (matched) return matched;
+        if (!Array.isArray(payload)) return payload;
+      } catch (error) {
+        if ((error as { status?: number })?.status === 404) {
+          continue;
+        }
+        console.warn("[provider status] V1 fallback status lookup failed:", statusPath, error);
       }
-    }
-
-    try {
-      const payload = await apiRequest<unknown>(config.baseUrl, purchasePath, {
-        method: "GET",
-        apiKey: config.apiKey,
-        apiSecret: config.apiSecret ?? undefined
-      });
-      const matched = findProviderEntryByReference(payload, [
-        providerReference ?? "",
-        order.paymentReference ?? "",
-        order.orderNumber,
-        order.id
-      ]);
-      if (matched) return matched;
-      if (!Array.isArray(payload)) return payload;
-      return null;
-    } catch (error) {
-      console.warn("[provider status] V1 fallback status lookup failed:", error);
     }
   }
 
@@ -1315,6 +1465,8 @@ async function markOrderCompleted(
   } catch (smsErr) {
     console.error("[provider] Order complete SMS error:", smsErr);
   }
+
+  await releaseNextQueuedSerializedOrder(orderId);
 }
 
 async function markOrderFailed(
@@ -1596,7 +1748,7 @@ export const dataProviderService = {
 
   async testConnection(configId?: string): Promise<{ ok: boolean; message: string }> {
     let config: ApiConfiguration | null = null;
-    let testPath: string = "/";
+    let testedPaths: string[] = [];
     let baseUrl = "";
     
     try {
@@ -1615,66 +1767,40 @@ export const dataProviderService = {
 
       baseUrl = config.baseUrl;
       const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
-      // Detect GhBundle API (direct or proxy URLs)
-      const isGhBundle = isGhBundleBaseUrl(baseUrl);
-      
-      // For GhBundle, try /balance first, then /services as fallback
-      // Use /balance for GhBundle (simple GET endpoint), /normal-orders for V1, or custom test endpoint
-      testPath = endpoints.test ?? "";
-      if (isGhBundle) {
-        testPath = resolveGhBundleEndpoint(testPath, "/balance");
-      } else if (!testPath) {
-        if (isV1Provider(config)) {
-          testPath = "/normal-orders";
-        } else {
-          testPath = "/";
-        }
-      }
-
-      const fullUrl = getUrl(baseUrl, testPath);
-      console.log("[testConnection] Testing:", { 
+      testedPaths = getProviderTestCandidatePaths(config, endpoints);
+      console.log("[testConnection] Testing:", {
         baseUrl, 
-        testPath, 
-        fullUrl,
-        isGhBundle, 
+        testedPaths,
         hasApiKey: Boolean(config.apiKey),
         customTestEndpoint: Boolean(endpoints.test)
       });
 
-      try {
-        const result = await apiRequest(baseUrl, testPath, {
-          method: "GET",
-          apiKey: config.apiKey,
-          apiSecret: config.apiSecret ?? undefined
-        });
-        console.log("[testConnection] Success - response:", typeof result === "object" ? JSON.stringify(result).slice(0, 200) : "ok");
-        return { ok: true, message: "Connection successful." };
-      } catch (firstError) {
-        // For GhBundle, if /balance fails with 404, try /services as fallback
-        if (isGhBundle && testPath === "/balance") {
-          const status = (firstError as { status?: number })?.status;
-          const errBody = (firstError as { body?: string })?.body || "";
-          const isHtmlError = errBody.trim().startsWith("<!DOCTYPE") || errBody.trim().startsWith("<!doctype") || errBody.trim().startsWith("<html");
-          
-          if (status === 404 && isHtmlError) {
-            console.log("[testConnection] /balance returned 404 HTML, trying /services as fallback");
-            try {
-              const fallbackResult = await apiRequest(baseUrl, "/services", {
-                method: "GET",
-                apiKey: config.apiKey,
-                apiSecret: config.apiSecret ?? undefined
-              });
-              console.log("[testConnection] Fallback /services success - response:", typeof fallbackResult === "object" ? JSON.stringify(fallbackResult).slice(0, 200) : "ok");
-              return { ok: true, message: "Connection successful (tested via /services endpoint)." };
-            } catch (fallbackError) {
-              // If fallback also fails, throw the original error
-              throw firstError;
-            }
+      for (const testPath of testedPaths) {
+        try {
+          const result = await apiRequest(baseUrl, testPath, {
+            method: "GET",
+            apiKey: config.apiKey,
+            apiSecret: config.apiSecret ?? undefined
+          });
+          console.log("[testConnection] Success via:", testPath);
+          console.log("[testConnection] Response:", typeof result === "object" ? JSON.stringify(result).slice(0, 200) : "ok");
+          return { ok: true, message: `Connection successful via ${testPath}.` };
+        } catch (error) {
+          const status = (error as { status?: number })?.status;
+          if (status === 404) {
+            continue;
           }
+          if (status === 405 || status === 422) {
+            return { ok: true, message: `Connection successful (route found at ${testPath}).` };
+          }
+          throw error;
         }
-        // Re-throw if not a fallback case
-        throw firstError;
       }
+
+      return {
+        ok: false,
+        message: `No working API endpoint was found under "${baseUrl}". Checked: ${testedPaths.join(", ")}. Jaybart is currently returning 404 for the saved routes, so this base URL likely points to the dashboard or requires custom endpoint paths. Update the test, purchase, and status endpoints in Settings > API Configuration.`
+      };
     } catch (err) {
       console.error("[testConnection] Error:", err);
       const status = (err as { status?: number })?.status;
@@ -1686,17 +1812,15 @@ export const dataProviderService = {
       }
       
       if (status === 404 && isHtmlError) {
-        // 404 with HTML usually means wrong endpoint or authentication issue
-        const isGhBundleUrl = baseUrl && isGhBundleBaseUrl(baseUrl);
-        if (isGhBundleUrl) {
-          return { 
-            ok: false, 
-            message: `Endpoint not found (404). This usually means: 1) Your API key is invalid or missing, 2) The endpoint doesn't exist on this API version, or 3) Authentication failed. Verify your API key in Settings > API Configuration and ensure it matches your GhBundle account.` 
+        if (baseUrl && isGhBundleBaseUrl(baseUrl)) {
+          return {
+            ok: false,
+            message: "Endpoint not found (404). Verify your GhBundle base URL and API token in Settings > API Configuration."
           };
         }
-        return { 
-          ok: false, 
-          message: `Endpoint not found (404). The test endpoint "${testPath}" does not exist on "${baseUrl || "your API"}". Check your base URL and endpoint configuration. If using GhBundle, use base URL: https://ghbundle.com/api/v1.` 
+        return {
+          ok: false,
+          message: `Endpoint not found (404). None of the tested routes exist on "${baseUrl || "your API"}". Update the base URL and custom endpoint paths in Settings > API Configuration.`
         };
       }
       
@@ -1932,6 +2056,33 @@ export const dataProviderService = {
       return { ok: true, reference: "Already completed" };
     }
 
+    if (order.paymentStatus !== "COMPLETED" && order.paymentMethod !== "WALLET") {
+      console.log("[fulfillOrder] Payment not completed yet, skipping provider call:", orderId);
+      return { ok: true, status: order.status };
+    }
+
+    const blockingOrder = await findBlockingSerializedOrder(orderId);
+    if (blockingOrder) {
+      await prisma.order.updateMany({
+        where: {
+          id: orderId,
+          status: { in: ["PENDING", "PROCESSING", "FAILED"] }
+        },
+        data: {
+          status: "PENDING",
+          paymentStatus: "COMPLETED",
+          completedAt: null,
+          failedReason: null
+        }
+      });
+      console.log("[fulfillOrder] Duplicate active order detected. Queuing until previous order resolves:", {
+        orderId,
+        blockingOrderId: blockingOrder.id,
+        blockingOrderNumber: blockingOrder.orderNumber
+      });
+      return { ok: true, status: "PENDING", reference: blockingOrder.orderNumber };
+    }
+
     const config = await getActiveConfig();
     if (!config) {
       console.error("[fulfillOrder] No active API config found");
@@ -1951,10 +2102,11 @@ export const dataProviderService = {
     // Detect GhBundle API (direct or proxy URLs)
     const isGhBundle = isGhBundleBaseUrl(config.baseUrl);
     const isV1 = isV1Provider(config);
-    // Default purchase path: /orders for ghbundle.com, /api/purchase for others
-    const purchasePath = isGhBundle
-      ? resolveGhBundleEndpoint(endpoints.purchase, "/orders")
-      : (endpoints.purchase ?? "/api/purchase");
+    const purchasePaths = isGhBundle
+      ? [resolveGhBundleEndpoint(endpoints.purchase, "/orders")]
+      : isV1
+        ? getV1PurchaseCandidatePaths(endpoints)
+        : [endpoints.purchase ?? "/api/purchase"];
     const purchaseMethod = endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
 
     let payload: object;
@@ -2069,10 +2221,10 @@ export const dataProviderService = {
       console.log("[fulfillOrder] Generic payload:", JSON.stringify(payload));
     }
 
-    console.log("[fulfillOrder] Calling provider API:", config.baseUrl + purchasePath, "Method:", purchaseMethod);
+    console.log("[fulfillOrder] Calling provider API candidates:", purchasePaths.map((path) => `${config.baseUrl}${path}`), "Method:", purchaseMethod);
 
     try {
-      const sendPurchaseRequest = async (activePayload: object): Promise<{
+      const sendPurchaseRequest = async (activePath: string, activePayload: object): Promise<{
         message?: string;
         order?: { reference_id?: number; total?: string; status?: string };
         reference?: string;
@@ -2088,7 +2240,7 @@ export const dataProviderService = {
             success?: boolean;
           }>(
             config.baseUrl,
-            purchasePath,
+            activePath,
             {
               method: purchaseMethod,
               apiKey: config.apiKey,
@@ -2104,7 +2256,7 @@ export const dataProviderService = {
             Object.entries(activePayload).forEach(([key, value]) => {
               queryParams.append(key, String(value));
             });
-            const pathWithQuery = `${purchasePath}${purchasePath.includes("?") ? "&" : "?"}${queryParams.toString()}`;
+            const pathWithQuery = `${activePath}${activePath.includes("?") ? "&" : "?"}${queryParams.toString()}`;
             return apiRequest<{
               message?: string;
               order?: { reference_id?: number; total?: string; status?: string };
@@ -2135,6 +2287,7 @@ export const dataProviderService = {
         transactionId?: string;
         success?: boolean;
       } | null = null;
+      let resolvedPurchasePath = purchasePaths[0];
 
       for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
         payload = attempts[attemptIndex];
@@ -2142,19 +2295,46 @@ export const dataProviderService = {
           console.log(`[fulfillOrder] Provider attempt ${attemptIndex + 1}/${attempts.length}:`, JSON.stringify(payload));
         }
 
-        try {
-          result = await sendPurchaseRequest(payload);
-        } catch (attemptError) {
-          const attemptMsg = parseProviderError(attemptError);
-          const shouldRetryVariant = isV1 && isV1SizeVariantUnavailableMessage(attemptMsg) && attemptIndex < attempts.length - 1;
-          if (shouldRetryVariant) {
-            console.warn(`[fulfillOrder] Variant unavailable, trying next size candidate (${attemptIndex + 2}/${attempts.length})`);
-            continue;
+        let shouldRetryVariant = false;
+        let lastPathError: unknown = null;
+
+        for (let pathIndex = 0; pathIndex < purchasePaths.length; pathIndex++) {
+          const purchasePath = purchasePaths[pathIndex];
+          try {
+            result = await sendPurchaseRequest(purchasePath, payload);
+            resolvedPurchasePath = purchasePath;
+            break;
+          } catch (attemptError) {
+            const attemptMsg = parseProviderError(attemptError);
+            const status = (attemptError as { status?: number })?.status;
+            shouldRetryVariant = Boolean(
+              isV1 &&
+              isV1SizeVariantUnavailableMessage(attemptMsg) &&
+              attemptIndex < attempts.length - 1
+            );
+            if (shouldRetryVariant) {
+              console.warn(`[fulfillOrder] Variant unavailable, trying next size candidate (${attemptIndex + 2}/${attempts.length})`);
+              lastPathError = attemptError;
+              break;
+            }
+            if (isV1 && status === 404 && pathIndex < purchasePaths.length - 1) {
+              lastPathError = attemptError;
+              continue;
+            }
+            throw attemptError;
           }
-          throw attemptError;
         }
 
-        console.log("[fulfillOrder] Provider API response:", JSON.stringify(result));
+        if (shouldRetryVariant) {
+          result = null;
+          continue;
+        }
+
+        if (!result) {
+          throw lastPathError ?? new Error("Unable to fulfill order with provider.");
+        }
+
+        console.log("[fulfillOrder] Provider API response:", JSON.stringify(result), "| path:", resolvedPurchasePath);
 
         const reference =
           extractProviderReference(result) ??
@@ -2177,7 +2357,10 @@ export const dataProviderService = {
             orderId,
             failedReason,
             normalizeJsonObject(payload),
-            normalizeJsonObject(result)
+            normalizeJsonObject({
+              ...normalizeJsonObject(result),
+              _purchasePath: resolvedPurchasePath
+            })
           );
           return { ok: false, error: failedReason, reference, status: "FAILED" };
         }
@@ -2186,7 +2369,10 @@ export const dataProviderService = {
           await markOrderCompleted(
             orderId,
             normalizeJsonObject(payload),
-            normalizeJsonObject(result)
+            normalizeJsonObject({
+              ...normalizeJsonObject(result),
+              _purchasePath: resolvedPurchasePath
+            })
           );
           return { ok: true, reference, status: "COMPLETED" };
         }
@@ -2202,7 +2388,10 @@ export const dataProviderService = {
             completedAt: null,
             failedReason: null,
             apiRequestPayload: normalizeJsonObject(payload),
-            apiResponsePayload: normalizeJsonObject(result)
+            apiResponsePayload: normalizeJsonObject({
+              ...normalizeJsonObject(result),
+              _purchasePath: resolvedPurchasePath
+            })
           }
         });
 
@@ -2249,6 +2438,26 @@ export const dataProviderService = {
         await syncOrderStatusInternal(order.id);
       } catch (error) {
         console.error("[provider] Failed to sync order status:", order.id, error);
+      }
+    }
+  },
+
+  async syncRecentInProgressOrders(limit = 20): Promise<void> {
+    const processingOrders = await prisma.order.findMany({
+      where: {
+        status: "PROCESSING",
+        paymentStatus: "COMPLETED"
+      },
+      select: { id: true },
+      orderBy: { updatedAt: "desc" },
+      take: limit
+    });
+
+    for (const order of processingOrders) {
+      try {
+        await syncOrderStatusInternal(order.id);
+      } catch (error) {
+        console.error("[provider] Failed to sync recent order status:", order.id, error);
       }
     }
   }

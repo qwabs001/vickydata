@@ -9,7 +9,17 @@ type ApiConfig = {
   name: string;
   baseUrl: string;
   hasApiKey: boolean;
+  endpoints?: Partial<ApiEndpoints>;
   isActive: boolean;
+};
+
+type ApiEndpoints = {
+  networks: string;
+  plans: string;
+  purchase: string;
+  test: string;
+  status: string;
+  purchaseMethod: "GET" | "POST";
 };
 
 type ServiceStatus = {
@@ -18,8 +28,21 @@ type ServiceStatus = {
   latencyMs?: number;
 };
 
+const EMPTY_ENDPOINTS: ApiEndpoints = {
+  networks: "",
+  plans: "",
+  purchase: "",
+  test: "",
+  status: "",
+  purchaseMethod: "POST"
+};
+
 function isGhBundleUrl(url: string): boolean {
   return /ghbundle\.com|ghbundle-reseller-api-proxy/i.test(url);
+}
+
+function isJaybartUrl(url: string): boolean {
+  return /jaybartservices\.com/i.test(url);
 }
 
 function getProviderDefaults(baseUrl: string) {
@@ -38,10 +61,49 @@ function getProviderDefaults(baseUrl: string) {
     };
   }
 
+  if (isJaybartUrl(baseUrl)) {
+    return {
+      provider: "v1",
+      name: "Jaybart API",
+      endpoints: {
+        ...EMPTY_ENDPOINTS,
+        purchaseMethod: "POST" as const
+      }
+    };
+  }
+
   return {
     provider: "v1",
     name: "Data Provider API",
-    endpoints: { test: "/normal-orders", purchase: "/normal-orders", purchaseMethod: "POST" as const }
+    endpoints: {
+      ...EMPTY_ENDPOINTS,
+      test: "/normal-orders",
+      purchase: "/normal-orders",
+      purchaseMethod: "POST" as const
+    }
+  };
+}
+
+function mergeEndpointInputs(baseUrl: string, input: ApiEndpoints): ApiEndpoints {
+  const defaults = getProviderDefaults(baseUrl).endpoints;
+  return {
+    networks: input.networks.trim() || defaults.networks || "",
+    plans: input.plans.trim() || defaults.plans || "",
+    purchase: input.purchase.trim() || defaults.purchase || "",
+    test: input.test.trim() || defaults.test || "",
+    status: input.status.trim() || defaults.status || "",
+    purchaseMethod: input.purchaseMethod
+  };
+}
+
+function toEndpointPayload(endpoints: ApiEndpoints) {
+  return {
+    ...(endpoints.networks ? { networks: endpoints.networks } : {}),
+    ...(endpoints.plans ? { plans: endpoints.plans } : {}),
+    ...(endpoints.purchase ? { purchase: endpoints.purchase } : {}),
+    ...(endpoints.test ? { test: endpoints.test } : {}),
+    ...(endpoints.status ? { status: endpoints.status } : {}),
+    purchaseMethod: endpoints.purchaseMethod
   };
 }
 
@@ -57,6 +119,7 @@ export default function Page() {
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://ghbundle.com/api/v1");
+  const [endpoints, setEndpoints] = useState<ApiEndpoints>(getProviderDefaults("https://ghbundle.com/api/v1").endpoints);
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
   const [showToken, setShowToken] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
@@ -116,8 +179,22 @@ export default function Page() {
   useEffect(() => {
     if (activeConfig?.baseUrl) {
       setBaseUrl(activeConfig.baseUrl);
+      setEndpoints({
+        ...EMPTY_ENDPOINTS,
+        ...getProviderDefaults(activeConfig.baseUrl).endpoints,
+        ...(activeConfig.endpoints ?? {}),
+        purchaseMethod:
+          activeConfig.endpoints?.purchaseMethod === "GET" || activeConfig.endpoints?.purchaseMethod === "POST"
+            ? activeConfig.endpoints.purchaseMethod
+            : getProviderDefaults(activeConfig.baseUrl).endpoints.purchaseMethod
+      });
     }
-  }, [activeConfig?.id, activeConfig?.baseUrl]);
+  }, [activeConfig]);
+
+  useEffect(() => {
+    if (activeConfig || connected) return;
+    setEndpoints(getProviderDefaults(baseUrl).endpoints);
+  }, [activeConfig, baseUrl, connected]);
 
   const showNotice = (msg: string) => {
     setNotice(msg);
@@ -147,13 +224,14 @@ export default function Page() {
       const token = apiKey.trim();
       const secret = apiSecret.trim();
       const defaults = getProviderDefaults(resolvedBaseUrl);
+      const resolvedEndpoints = mergeEndpointInputs(resolvedBaseUrl, endpoints);
       const payload = {
         provider: defaults.provider,
         name: defaults.name,
         apiKey: token,
         apiSecret: secret,
         baseUrl: resolvedBaseUrl,
-        endpoints: defaults.endpoints
+        endpoints: toEndpointPayload(resolvedEndpoints)
       };
       const existing =
         configs.find((c) => c.provider === payload.provider) ??
@@ -185,6 +263,7 @@ export default function Page() {
       showNotice("API connected successfully. You can now sync and fulfill orders.");
       setApiKey("");
       setApiSecret("");
+      setEndpoints(resolvedEndpoints);
       loadConfigs();
     } catch {
       setError("Unable to connect.");
@@ -457,6 +536,80 @@ export default function Page() {
                   ? "Leave this empty for GhBundle. Separate signing headers are not used for GhBundle API requests."
                   : "Leave empty to reuse API token as secret. Use this if your provider requires a separate signing secret."}
               </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-[#f8fafc] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Custom Endpoints</p>
+                  <p className="mt-1 text-xs text-slate-400">Leave fields empty to use the provider preset. Jaybart usually needs these set explicitly.</p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-500">
+                  {endpoints.purchaseMethod}
+                </span>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Test Endpoint</label>
+                  <input
+                    type="text"
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                    placeholder={getProviderDefaults(baseUrl).endpoints.test || "/balance"}
+                    value={endpoints.test}
+                    onChange={(e) => setEndpoints((prev) => ({ ...prev, test: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Purchase Endpoint</label>
+                  <input
+                    type="text"
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                    placeholder={getProviderDefaults(baseUrl).endpoints.purchase || "/orders"}
+                    value={endpoints.purchase}
+                    onChange={(e) => setEndpoints((prev) => ({ ...prev, purchase: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Status Endpoint</label>
+                  <input
+                    type="text"
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                    placeholder={getProviderDefaults(baseUrl).endpoints.status || "/orders/{reference}"}
+                    value={endpoints.status}
+                    onChange={(e) => setEndpoints((prev) => ({ ...prev, status: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Purchase Method</label>
+                  <select
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                    value={endpoints.purchaseMethod}
+                    onChange={(e) => setEndpoints((prev) => ({ ...prev, purchaseMethod: e.target.value as ApiEndpoints["purchaseMethod"] }))}
+                  >
+                    <option value="POST">POST</option>
+                    <option value="GET">GET</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Networks Endpoint</label>
+                  <input
+                    type="text"
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                    placeholder={getProviderDefaults(baseUrl).endpoints.networks || "/services"}
+                    value={endpoints.networks}
+                    onChange={(e) => setEndpoints((prev) => ({ ...prev, networks: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Plans Endpoint</label>
+                  <input
+                    type="text"
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                    placeholder={getProviderDefaults(baseUrl).endpoints.plans || "/plans/{networkId}"}
+                    value={endpoints.plans}
+                    onChange={(e) => setEndpoints((prev) => ({ ...prev, plans: e.target.value }))}
+                  />
+                </div>
+              </div>
             </div>
             <button
               type="button"

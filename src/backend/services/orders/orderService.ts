@@ -1,7 +1,59 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/backend/lib/db/prisma";
 import { toLocalGhanaPhone } from "@/backend/lib/utils/phoneFormatter";
 
 const generateOrderNumber = () => `GH-${Date.now()}`;
+const ACTIVE_SERIALIZED_ORDER_STATUSES = ["PENDING", "PROCESSING"] as const;
+
+async function findBlockingPaidDuplicateOrder(
+  tx: Prisma.TransactionClient,
+  params: {
+    currentOrderId?: string;
+    recipientNumber: string;
+    networkId: string;
+    dataPlanId: string;
+  }
+) {
+  const plan = await tx.dataPlan.findUnique({
+    where: { id: params.dataPlanId },
+    select: { dataInMB: true }
+  });
+
+  if (!plan) return null;
+
+  const activeOrders = await tx.order.findMany({
+    where: {
+      recipientNumber: params.recipientNumber,
+      networkId: params.networkId,
+      paymentStatus: "COMPLETED",
+      status: { in: [...ACTIVE_SERIALIZED_ORDER_STATUSES] },
+      dataPlan: {
+        is: {
+          dataInMB: plan.dataInMB
+        }
+      }
+    },
+    select: {
+      id: true,
+      orderNumber: true,
+      createdAt: true,
+      status: true
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+  });
+
+  if (activeOrders.length === 0) return null;
+  if (!params.currentOrderId) return activeOrders[0];
+
+  for (const candidate of activeOrders) {
+    if (candidate.id === params.currentOrderId) {
+      return null;
+    }
+    return candidate;
+  }
+
+  return null;
+}
 
 export const orderService = {
   async createOrder(payload: {
@@ -16,9 +68,6 @@ export const orderService = {
   }) {
     const recipientNumber = toLocalGhanaPhone(payload.recipientNumber);
     return prisma.$transaction(async (tx) => {
-      const existingOrders = await tx.order.count({
-        where: { userId: payload.userId }
-      });
       const user = await tx.user.findUnique({
         where: { id: payload.userId },
         select: { referredById: true, username: true }
@@ -107,6 +156,15 @@ export const orderService = {
         });
       }
 
+      const blockingOrder = useWallet
+        ? await findBlockingPaidDuplicateOrder(tx, {
+            recipientNumber,
+            networkId: payload.networkId,
+            dataPlanId: payload.dataPlanId
+          })
+        : null;
+      const shouldQueueBehindDuplicate = Boolean(blockingOrder);
+
       const order = await tx.order.create({
         data: {
           orderNumber: generateOrderNumber(),
@@ -116,7 +174,7 @@ export const orderService = {
           recipientNumber,
           amount: netAmount,
           currency: payload.currency ?? "GHS",
-          status: useWallet ? "PROCESSING" : "PENDING",
+          status: useWallet && !shouldQueueBehindDuplicate ? "PROCESSING" : "PENDING",
           paymentStatus: useWallet ? "COMPLETED" : "PENDING",
           paymentMethod: useWallet ? "WALLET" : undefined,
           rewardUsed: rewardToUse

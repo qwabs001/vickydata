@@ -4,7 +4,7 @@ import { prisma } from "@/backend/lib/db/prisma";
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const order = await prisma.order.findUnique({
+    let order = await prisma.order.findUnique({
       where: { id },
       include: {
         network: true,
@@ -12,6 +12,27 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
         user: true
       }
     });
+
+    if (!order) {
+      return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    }
+
+    if (order.status === "PROCESSING") {
+      try {
+        const { dataProviderService } = await import("@/backend/services/dataProvider/dataProviderService");
+        await dataProviderService.syncOrderStatus(order.id);
+        order = await prisma.order.findUnique({
+          where: { id },
+          include: {
+            network: true,
+            dataPlan: true,
+            user: true
+          }
+        });
+      } catch (syncError) {
+        console.error("Order detail sync warning:", syncError);
+      }
+    }
 
     if (!order) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });

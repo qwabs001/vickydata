@@ -37,7 +37,17 @@ export async function GET(request: Request) {
     }
 
     // Run sync in background so response isn't delayed (sync can hit external provider API)
-    if (scope !== "all" && userId) {
+    if (scope === "all") {
+      void import("@/backend/services/dataProvider/dataProviderService")
+        .then(({ dataProviderService }) =>
+          dataProviderService.syncRecentInProgressOrders(20).catch((syncError) => {
+            console.error("Admin order status sync warning:", syncError);
+          })
+        )
+        .catch((importError) => {
+          console.error("Failed to import dataProviderService for admin sync:", importError);
+        });
+    } else if (userId) {
       void import("@/backend/services/dataProvider/dataProviderService")
         .then(({ dataProviderService }) =>
           dataProviderService.syncUserInProgressOrders(userId).catch((syncError) => {

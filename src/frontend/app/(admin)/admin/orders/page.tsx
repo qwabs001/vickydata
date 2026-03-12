@@ -150,6 +150,21 @@ export default function Page() {
     }
   };
 
+  useEffect(() => {
+    if (!user?.id || activeOrders === 0) return;
+
+    const intervalId = window.setInterval(() => {
+      fetch("/api/orders?scope=all&limit=300", { headers: { "x-user-id": user.id } })
+        .then((res) => res.json().catch(() => ({})))
+        .then((data) => setOrders(data?.orders ?? []))
+        .catch(() => {});
+    }, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeOrders, user?.id]);
+
   const openUserOrders = async (userId: string, username: string) => {
     setUserOrdersModal({ userId, username });
     setUserOrders([]);
