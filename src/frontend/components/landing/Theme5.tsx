@@ -113,6 +113,7 @@ const Theme5: React.FC = () => {
   const { plans } = useDataPlans(selectedNetwork?.id, selectedNetwork?.name);
 
   const primaryColor = accent || primary || "#f5c63d";
+  const deepSurfaceColor = "#0F172B";
   const brandName = "BundleArena";
 
   const primaryRgb = useMemo(() => {
@@ -414,6 +415,17 @@ const Theme5: React.FC = () => {
         .theme5-grid-glow {
           background-image: radial-gradient(circle at 15% 10%, rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.22), transparent 40%);
         }
+        .theme5-glass-card {
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.74) 0%, rgba(255, 255, 255, 0.44) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.72);
+          backdrop-filter: blur(18px);
+          -webkit-backdrop-filter: blur(18px);
+          box-shadow: 0 18px 40px rgba(15, 23, 43, 0.14);
+        }
+        .theme5-wallet-primary {
+          background: linear-gradient(145deg, #0f172b 0%, #16213f 52%, #203055 100%);
+          box-shadow: 0 20px 46px rgba(15, 23, 43, 0.26);
+        }
       `}</style>
 
       <header className="sticky top-0 z-40 border-b border-[#e8e2d8] bg-[#f8f7f4]/95 backdrop-blur">
@@ -524,16 +536,16 @@ const Theme5: React.FC = () => {
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-8 md:px-6 md:pb-14 md:pt-12">
+      <main className="mx-auto w-full max-w-[1180px] px-4 pb-40 pt-8 md:px-6 md:pb-14 md:pt-12">
         <section className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div className="theme5-grid-glow rounded-[28px] p-1">
             <div className="rounded-[24px] p-4 sm:p-7">
               <h1 className="text-[42px] font-extrabold leading-[1.04] tracking-[-0.02em] text-[#19140c] sm:text-[56px]">
-                Fast, Reliable
+                Instant, Affordable
                 <br />
                 <span style={{ color: primaryColor }}>Data Bundles</span>
                 <br />
-                for Ghana.
+                across Ghana.
               </h1>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -553,7 +565,7 @@ const Theme5: React.FC = () => {
           </div>
 
           <div className="relative hidden md:block">
-            <div className="theme5-surface relative rounded-[28px] border border-[#e7e0d4] bg-[#f9f8f6] p-4 sm:p-6">
+            <div className="theme5-surface relative overflow-visible rounded-[28px] border border-[#e7e0d4] bg-[#f9f8f6] p-5 sm:p-6">
               <div
                 className="absolute right-4 top-[-18px] inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold text-[#5a4e31] shadow-sm"
                 style={{ borderColor: primaryRgba(0.35), backgroundColor: primaryRgba(0.12) }}
@@ -564,37 +576,62 @@ const Theme5: React.FC = () => {
 
               <p className="text-[17px] font-bold text-[#1c1710]">Bundle Wallet</p>
 
-              <div className="mt-4 rounded-2xl bg-[#181308] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
-                <p className="text-[11px] uppercase tracking-[0.12em] text-white/70">Selected Bundle</p>
-                <div className="mt-2 flex items-end justify-between">
-                  <span className="max-w-[68%] truncate text-[24px] font-extrabold leading-none">{selectedBundleName}</span>
-                  <span className="mb-1 text-base font-bold">{formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}</span>
-                </div>
-                <div className="mt-5 h-[6px] w-full overflow-hidden rounded-full bg-white/25">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: selectedPlan ? "72%" : "15%", backgroundColor: primaryColor }}
-                  />
-                </div>
-                <div className="mt-2 text-right text-xs font-semibold text-white/70">{selectedNetworkName}</div>
-              </div>
+              <div className="relative mt-5 min-h-[310px] pb-10">
+                <div className="theme5-wallet-primary relative rounded-[28px] p-6 text-white">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/68">Selected Bundle</p>
+                  <div className="mt-3 flex items-end justify-between gap-4">
+                    <span className="max-w-[65%] truncate text-[28px] font-extrabold leading-none">{selectedBundleName}</span>
+                    <span className="mb-1 text-lg font-bold">{formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}</span>
+                  </div>
 
-              <div className="mt-4 flex items-center justify-between rounded-xl border border-[#ece5d8] bg-white px-4 py-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-9 w-9 items-center justify-center rounded-full"
-                    style={{ color: primaryColor, backgroundColor: primaryRgba(0.2) }}
-                  >
-                    <Signal size={16} />
+                  <div className="mt-8 h-[6px] w-full overflow-hidden rounded-full bg-white/15">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: selectedPlan ? "72%" : "15%", backgroundColor: primaryColor }}
+                    />
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#8f836f]">{selectedNetworkName}</p>
-                    <p className="text-sm font-bold text-[#211b12]">{selectedBundleName}</p>
+
+                  <div className="mt-4 flex items-center justify-between text-xs font-semibold text-white/68">
+                    <span>Secure checkout ready</span>
+                    <span>{selectedNetworkName}</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-extrabold text-[#09a54e]">{formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}</p>
-                  <p className="text-xs text-[#8f836f]">{checkoutState === "success" ? "Success" : "Ready"}</p>
+
+                <div className="theme5-glass-card absolute -right-2 top-12 w-[168px] rounded-[24px] p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#5f6c82]">
+                    Wallet Boost
+                  </p>
+                  <p className="mt-2 text-[28px] font-extrabold leading-none" style={{ color: primaryColor }}>
+                    +2GB
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-[#5f6c82]">
+                    Bonus applied to eligible orders.
+                  </p>
+                </div>
+
+                <div className="theme5-glass-card absolute -bottom-1 left-5 right-10 flex items-center justify-between gap-4 rounded-[24px] px-4 py-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center rounded-full"
+                      style={{ color: primaryColor, backgroundColor: primaryRgba(0.18) }}
+                    >
+                      <Signal size={18} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#697488]">
+                        {selectedNetworkName}
+                      </p>
+                      <p className="text-sm font-bold text-[#162033]">{selectedBundleName}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-extrabold text-[#09a54e]">
+                      {formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}
+                    </p>
+                    <p className="text-xs text-[#697488]">
+                      {checkoutState === "success" ? "Success" : "Ready to activate"}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -705,7 +742,10 @@ const Theme5: React.FC = () => {
             </div>
           </div>
 
-          <aside className="w-full overflow-hidden self-start rounded-2xl bg-[#1a140b] p-4 text-white shadow-[0_18px_42px_rgba(0,0,0,0.3)] sm:p-5">
+          <aside
+            className="hidden w-full overflow-hidden self-start rounded-2xl p-4 text-white shadow-[0_18px_42px_rgba(15,23,43,0.3)] md:block sm:p-5"
+            style={{ backgroundColor: deepSurfaceColor }}
+          >
             <h3 className="text-lg font-bold sm:text-xl">Order Summary</h3>
             <dl className="mt-4 space-y-3 text-xs sm:mt-5 sm:text-sm">
               <div className="flex items-center justify-between gap-4">
@@ -791,19 +831,41 @@ const Theme5: React.FC = () => {
         copyright 2026 - BundleArena
       </footer>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8e2d7] bg-[#f8f7f4]/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            setShowSignup(true);
-            setSignupError(null);
-          }}
-          className="flex w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-extrabold text-[#17120a] shadow-[inset_0_-2px_0_rgba(0,0,0,0.16)]"
-          style={{ backgroundColor: primaryColor }}
-        >
-          Create Free Account
-        </button>
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 text-white shadow-[0_-18px_42px_rgba(15,23,43,0.24)] backdrop-blur md:hidden"
+        style={{ backgroundColor: "rgba(15, 23, 43, 0.96)" }}
+      >
+        <div className="mx-auto max-w-[1180px]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
+                Order Summary
+              </p>
+              <p className="mt-1 truncate text-sm font-semibold text-white">
+                {selectedNetworkName} • {selectedBundleName}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
+                Total Pay
+              </p>
+              <p className="mt-1 text-[24px] font-extrabold leading-none" style={{ color: primaryColor }}>
+                {formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSecurePay}
+            disabled={!selectedPlan || isSubmitting}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60"
+            style={{ backgroundColor: primaryColor, color: deepSurfaceColor }}
+          >
+            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+            {isSubmitting ? "Processing Payment..." : isAuthenticated ? "Pay Securely Now" : "Login to Pay"}
+          </button>
+        </div>
       </div>
 
       <LoginModal
