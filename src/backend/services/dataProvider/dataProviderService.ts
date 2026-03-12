@@ -12,6 +12,30 @@ type EndpointsConfig = {
   purchaseMethod?: "GET" | "POST"; // HTTP method for purchase endpoint
 };
 
+const JAYBART_PROVIDER = "jaybart";
+const JAYBART_ENDPOINT_DEFAULTS = {
+  test: "/check-console-balance",
+  networks: "/fetch-networks",
+  plans: "/fetch-data-packages",
+  purchase: "/buy-other-package",
+  status: "/fetch-other-network-transaction",
+  purchaseMethod: "POST" as const
+};
+const GENERIC_LEGACY_ENDPOINTS = new Set([
+  "",
+  "/",
+  "/normal-orders",
+  "/orders",
+  "/purchase",
+  "/data-orders",
+  "/services",
+  "/balance",
+  "/me",
+  "/profile",
+  "/api/networks",
+  "/api/plans",
+  "/api/purchase"
+]);
 const V1_PURCHASE_ENDPOINT_CANDIDATES = ["/normal-orders", "/orders", "/purchase", "/data-orders"];
 const V1_TEST_ENDPOINT_CANDIDATES = ["/services", "/balance", "/me", "/profile"];
 const V1_STATUS_ENDPOINT_TEMPLATES = [
@@ -62,6 +86,14 @@ function getProviderTestCandidatePaths(config: ApiConfiguration, endpoints: Endp
     ]);
   }
 
+  if (isJaybartProvider(config)) {
+    return uniqueNonEmptyPaths([
+      resolveJaybartEndpoint(endpoints.test, JAYBART_ENDPOINT_DEFAULTS.test),
+      resolveJaybartEndpoint(endpoints.networks, JAYBART_ENDPOINT_DEFAULTS.networks),
+      resolveJaybartEndpoint(endpoints.plans, JAYBART_ENDPOINT_DEFAULTS.plans)
+    ]);
+  }
+
   return uniqueNonEmptyPaths([
     endpoints.test,
     endpoints.networks,
@@ -97,7 +129,12 @@ function buildAuthHeaders(baseUrl: string, apiKey?: string, apiSecret?: string):
   const headers: Record<string, string> = {};
   const parsedKey = parseApiKey(apiKey);
   const isGhBundle = isGhBundleBaseUrl(baseUrl);
+  const isJaybart = isJaybartBaseUrl(baseUrl);
   if (parsedKey.raw) {
+    if (isJaybart) {
+      headers["x-api-key"] = parsedKey.token;
+      return headers;
+    }
     headers.Authorization = parsedKey.authorization;
     headers["X-API-KEY"] = parsedKey.token;
     if (!isGhBundle) {
@@ -350,6 +387,7 @@ async function apiRequest<T>(
   const logHeaders = { ...headers };
   if (logHeaders.Authorization) logHeaders.Authorization = logHeaders.Authorization.substring(0, 20) + "...";
   if (logHeaders["X-API-Key"]) logHeaders["X-API-Key"] = logHeaders["X-API-Key"].substring(0, 10) + "...";
+  if (logHeaders["x-api-key"]) logHeaders["x-api-key"] = logHeaders["x-api-key"].substring(0, 10) + "...";
   console.log("[apiRequest] Request:", {
     method: options.method ?? "GET",
     url,
@@ -539,13 +577,33 @@ async function tryFetchPlansFromApi(
   return null;
 }
 
-function isV1Provider(config: { provider: string; endpoints?: unknown }) {
-  return config.provider === "v1" || (config.endpoints as Record<string, string> | null)?.purchase?.includes("normal-orders");
+function isV1Provider(config: { provider: string; baseUrl?: string; endpoints?: unknown }) {
+  const endpoints = (config.endpoints as Record<string, string> | null) ?? null;
+  const purchase = endpoints?.purchase ?? "";
+  const baseUrl = config.baseUrl ?? "";
+  if (isJaybartBaseUrl(baseUrl)) return false;
+  return config.provider === "v1" || purchase.includes("normal-orders");
 }
 
 function isGhBundleBaseUrl(baseUrl: string): boolean {
   const normalized = baseUrl.toLowerCase();
   return normalized.includes("ghbundle.com") || normalized.includes("ghbundle-reseller-api-proxy");
+}
+
+function isJaybartBaseUrl(baseUrl: string): boolean {
+  const normalized = baseUrl.toLowerCase();
+  return normalized.includes("jaybartservices.com");
+}
+
+function isJaybartProvider(config: { provider: string; baseUrl?: string; endpoints?: unknown }): boolean {
+  return config.provider === JAYBART_PROVIDER || isJaybartBaseUrl(config.baseUrl ?? "");
+}
+
+function resolveJaybartEndpoint(path: string | undefined, fallback: string): string {
+  const normalized = path?.trim() ?? "";
+  if (!normalized) return fallback;
+  if (GENERIC_LEGACY_ENDPOINTS.has(normalized.toLowerCase())) return fallback;
+  return normalized;
 }
 
 function resolveGhBundleEndpoint(path: string | undefined, fallback: string): string {
@@ -572,6 +630,22 @@ type GhBundleService = {
   price?: number;
   validity?: string;
   status?: string;
+};
+
+type JaybartNetwork = {
+  id?: number;
+  name?: string;
+  description?: string;
+};
+
+type JaybartPackage = {
+  id?: number;
+  network_id?: number;
+  volume?: number;
+  volumeGB?: string;
+  console_price?: string;
+  status?: string;
+  network?: string;
 };
 
 type ProviderOrderState = "COMPLETED" | "PROCESSING" | "FAILED" | "UNKNOWN";
@@ -651,6 +725,7 @@ function classifyStatusValue(value: unknown): ProviderOrderState {
     normalized === "pending" ||
     normalized === "processing" ||
     normalized === "process" ||
+    normalized === "placed" ||
     normalized === "inprogress" ||
     normalized === "in-progress" ||
     normalized === "in progress" ||
@@ -660,7 +735,8 @@ function classifyStatusValue(value: unknown): ProviderOrderState {
     normalized === "initiated" ||
     normalized.includes("pending") ||
     normalized.includes("processing") ||
-    normalized.includes("in progress")
+    normalized.includes("in progress") ||
+    normalized.includes("placed")
   ) {
     return "PROCESSING";
   }
@@ -694,7 +770,8 @@ function extractProviderState(payload: unknown): ProviderOrderState {
     toObject(root.order),
     toObject(root.data),
     toObject(root.result),
-    toObject(root.transaction)
+    toObject(root.transaction),
+    ...collectProviderEntries(payload)
   ].filter((entry): entry is Record<string, unknown> => Boolean(entry));
 
   let sawProcessing = false;
@@ -758,6 +835,7 @@ function extractProviderReference(payload: unknown): string | null {
     root.clientOrderId,
     root.transactionId,
     root.transaction_id,
+    root.transaction_code,
     root.externalref,
     root.externalRef,
     root.thirdpartyref,
@@ -778,6 +856,7 @@ function extractProviderReference(payload: unknown): string | null {
     nestedData?.clientOrderId,
     nestedData?.transactionid,
     nestedData?.transactionId,
+    nestedData?.transaction_code,
     nestedData?.externalref
   ];
 
@@ -831,7 +910,7 @@ function collectProviderEntries(payload: unknown): Record<string, unknown>[] {
   }
   const root = toObject(payload);
   if (!root) return [];
-  const possibleLists = [root.orders, root.data, root.results, root.transactions, root.items];
+  const possibleLists = [root.orders, root.data, root.results, root.transactions, root.items, root.order_items];
   for (const list of possibleLists) {
     if (!Array.isArray(list)) continue;
     return list
@@ -869,6 +948,8 @@ const LOGO_MAP: Record<string, string> = {
   mtn: "/images/networks/MTN-Logo.png",
   TELECEL: "/images/networks/Telecel.webp",
   Telecel: "/images/networks/Telecel.webp",
+  AIRTELTIGO: "/images/networks/airteltigo.png",
+  AirtelTigo: "/images/networks/airteltigo.png",
   ISHARE: "/images/networks/MTN-Logo.png",
   BIGTIME: "/images/networks/MTN-Logo.png"
 };
@@ -948,6 +1029,113 @@ function resolveV1PlanSize(
   }
 
   return candidates[0] ?? "1GB";
+}
+
+function normalizeJaybartNetwork(raw: JaybartNetwork): {
+  providerNetworkId: number | null;
+  providerName: string;
+  name: string;
+  displayName: string;
+} {
+  const providerNetworkId = Number.isFinite(Number(raw.id)) ? Number(raw.id) : null;
+  const providerName = (raw.name ?? "").trim();
+  const normalized = normalizeV1Key(providerName);
+
+  if (normalized === "ATISHARE" || normalized === "ISHARE") {
+    return {
+      providerNetworkId,
+      providerName: providerName || "AT - iSHare",
+      name: "ISHARE",
+      displayName: "iShare"
+    };
+  }
+
+  if (normalized === "TELECEL" || normalized === "VODAFONE") {
+    return {
+      providerNetworkId,
+      providerName: providerName || "TELECEL",
+      name: "TELECEL",
+      displayName: "Telecel"
+    };
+  }
+
+  if (normalized === "ATBIGTIME" || normalized === "BIGTIME" || normalized === "AIRTELTIGO") {
+    return {
+      providerNetworkId,
+      providerName: providerName || "AT - BigTime",
+      name: "AIRTELTIGO",
+      displayName: "AirtelTigo"
+    };
+  }
+
+  if (normalized === "MTNAFA") {
+    return {
+      providerNetworkId,
+      providerName: providerName || "MTN AFA",
+      name: "MTN AFA",
+      displayName: "MTN AFA"
+    };
+  }
+
+  if (normalized === "MTNSUNDAY") {
+    return {
+      providerNetworkId,
+      providerName: providerName || "MTN SUNDAY",
+      name: "MTN SUNDAY",
+      displayName: "MTN Sunday"
+    };
+  }
+
+  return {
+    providerNetworkId,
+    providerName: providerName || "MTN",
+    name: "MTN",
+    displayName: "MTN"
+  };
+}
+
+function resolveJaybartNetworkConfig(network?: { name?: string | null; displayName?: string | null; apiConfig?: unknown } | null) {
+  const apiConfig = toObject(network?.apiConfig);
+  const providerNetworkId = Number(apiConfig?.providerNetworkId ?? apiConfig?.network_id ?? apiConfig?.id);
+  const rawProviderName =
+    toReadable(apiConfig?.providerNetworkName) ||
+    toReadable(apiConfig?.provider_name) ||
+    toReadable(network?.displayName) ||
+    toReadable(network?.name);
+  const normalized = normalizeJaybartNetwork({
+    id: Number.isFinite(providerNetworkId) ? providerNetworkId : undefined,
+    name: rawProviderName
+  });
+
+  if (Number.isFinite(providerNetworkId)) {
+    return {
+      ...normalized,
+      providerNetworkId
+    };
+  }
+
+  return normalizeJaybartNetwork({ name: rawProviderName });
+}
+
+function resolveJaybartSharedBundle(dataPlan?: { name?: string | null; dataAmount?: string | null; dataInMB?: number | null } | null): number {
+  const candidates = [dataPlan?.dataAmount, dataPlan?.name]
+    .map((value) => value?.trim() ?? "")
+    .filter((value) => value.length > 0);
+
+  for (const candidate of candidates) {
+    const numeric = Number(candidate.replace(/[^0-9.]/g, ""));
+    if (!Number.isFinite(numeric) || numeric <= 0) continue;
+    const lower = candidate.toLowerCase();
+    if (lower.includes("tb")) return Math.round(numeric * 1_000_000);
+    if (lower.includes("gb")) return Math.round(numeric * 1000);
+    if (lower.includes("mb")) return Math.round(numeric);
+  }
+
+  if (dataPlan?.dataInMB && dataPlan.dataInMB > 0) {
+    return Math.round(dataPlan.dataInMB);
+  }
+
+  return 1000;
 }
 
 type V1PurchasePayload = {
@@ -1078,6 +1266,224 @@ async function fetchGhBundleServices(config: ApiConfiguration): Promise<GhBundle
   }
 
   return allServices;
+}
+
+async function fetchJaybartNetworks(config: ApiConfiguration): Promise<JaybartNetwork[]> {
+  const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
+  const path = resolveJaybartEndpoint(endpoints.networks, JAYBART_ENDPOINT_DEFAULTS.networks);
+  const payload = await apiRequest<JaybartNetwork[] | { data?: JaybartNetwork[] }>(config.baseUrl, path, {
+    method: "GET",
+    apiKey: config.apiKey,
+    apiSecret: config.apiSecret ?? undefined
+  });
+
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+async function fetchJaybartPackages(config: ApiConfiguration): Promise<JaybartPackage[]> {
+  const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
+  const path = resolveJaybartEndpoint(endpoints.plans, JAYBART_ENDPOINT_DEFAULTS.plans);
+  const payload = await apiRequest<JaybartPackage[] | { data?: JaybartPackage[] }>(config.baseUrl, path, {
+    method: "GET",
+    apiKey: config.apiKey,
+    apiSecret: config.apiSecret ?? undefined
+  });
+
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+async function syncJaybartNetworksAndPlans(
+  config: ApiConfiguration,
+  options?: {
+    markupPercent?: number;
+    networkMarkups?: Record<string, number>;
+    planMarkups?: Record<string, number>;
+    networksToImport?: string[];
+    servicesToImport?: Array<{ network: string; plan: string }>;
+    networkLogos?: Record<string, string>;
+  }
+): Promise<{ ok: boolean; networksAdded: number; plansAdded: number; error?: string }> {
+  const networkLogos = options?.networkLogos ?? {};
+  const networkMarkups = options?.networkMarkups ?? {};
+  const planMarkups = options?.planMarkups ?? {};
+  const markupPercent = options?.markupPercent ?? 0;
+  const networksToImport = options?.networksToImport;
+  const servicesToImport = options?.servicesToImport;
+  const applyMarkup = (basePrice: number, networkName: string, planName: string) => {
+    const planPct = planMarkups[planKey(networkName, planName)];
+    const netPct = networkMarkups[networkName];
+    const pct = planPct ?? netPct ?? markupPercent;
+    return Math.round(basePrice * (1 + pct / 100) * 100) / 100;
+  };
+
+  const allowedPlansByNetwork = new Map<string, Set<string>>();
+  if (servicesToImport && servicesToImport.length > 0) {
+    for (const service of servicesToImport) {
+      if (!allowedPlansByNetwork.has(service.network)) {
+        allowedPlansByNetwork.set(service.network, new Set());
+      }
+      allowedPlansByNetwork.get(service.network)!.add(service.plan);
+    }
+  }
+
+  let networksAdded = 0;
+  let plansAdded = 0;
+
+  try {
+    const [providerNetworks, providerPackages] = await Promise.all([
+      fetchJaybartNetworks(config),
+      fetchJaybartPackages(config)
+    ]);
+
+    if (providerNetworks.length === 0) {
+      return {
+        ok: true,
+        networksAdded: 0,
+        plansAdded: 0,
+        error: "No networks returned from Jaybart."
+      };
+    }
+
+    const networkMap = new Map<number, ReturnType<typeof normalizeJaybartNetwork>>();
+    for (const network of providerNetworks) {
+      const normalized = normalizeJaybartNetwork(network);
+      if (normalized.providerNetworkId != null) {
+        networkMap.set(normalized.providerNetworkId, normalized);
+      }
+    }
+
+    const packagesByNetwork = new Map<string, JaybartPackage[]>();
+    for (const pkg of providerPackages) {
+      const networkId = Number(pkg.network_id);
+      const normalized =
+        (Number.isFinite(networkId) ? networkMap.get(networkId) : null) ??
+        normalizeJaybartNetwork({ id: pkg.network_id, name: pkg.network });
+      if (networksToImport && networksToImport.length > 0 && !networksToImport.includes(normalized.name)) {
+        continue;
+      }
+      if (!packagesByNetwork.has(normalized.name)) {
+        packagesByNetwork.set(normalized.name, []);
+      }
+      packagesByNetwork.get(normalized.name)!.push(pkg);
+    }
+
+    let networkSort = 1;
+    for (const providerNetwork of providerNetworks) {
+      const normalized = normalizeJaybartNetwork(providerNetwork);
+      if (networksToImport && networksToImport.length > 0 && !networksToImport.includes(normalized.name)) {
+        continue;
+      }
+      if (allowedPlansByNetwork.size > 0 && !allowedPlansByNetwork.has(normalized.name)) {
+        continue;
+      }
+
+      const customLogo = networkLogos[normalized.name];
+      const defaultLogo =
+        LOGO_MAP[normalized.name] ||
+        LOGO_MAP[normalized.displayName] ||
+        LOGO_MAP[normalized.name.toUpperCase()] ||
+        LOGO_MAP[normalized.name.toLowerCase()] ||
+        "/images/networks/MTN-Logo.png";
+
+      const network = await prisma.network.upsert({
+        where: { name: normalized.name },
+        create: {
+          name: normalized.name,
+          displayName: normalized.displayName,
+          logoUrl: customLogo?.trim() || defaultLogo,
+          sortOrder: networkSort,
+          apiConfig: {
+            provider: JAYBART_PROVIDER,
+            providerNetworkId: normalized.providerNetworkId,
+            providerNetworkName: normalized.providerName,
+            providerDescription: providerNetwork.description ?? null
+          }
+        },
+        update: {
+          displayName: normalized.displayName,
+          logoUrl: customLogo?.trim() || defaultLogo,
+          sortOrder: networkSort,
+          apiConfig: {
+            provider: JAYBART_PROVIDER,
+            providerNetworkId: normalized.providerNetworkId,
+            providerNetworkName: normalized.providerName,
+            providerDescription: providerNetwork.description ?? null
+          }
+        }
+      });
+      networksAdded++;
+      networkSort++;
+
+      const allowedPlans = allowedPlansByNetwork.get(normalized.name);
+      const packages = (packagesByNetwork.get(normalized.name) ?? [])
+        .filter((pkg) => {
+          const status = (pkg.status ?? "").toString().toLowerCase();
+          return !status.includes("out");
+        })
+        .sort((a, b) => Number(a.volume ?? 0) - Number(b.volume ?? 0));
+
+      const activePlanNames = new Set<string>();
+      let planSort = 1;
+      for (const pkg of packages) {
+        const dataAmount = (pkg.volumeGB ?? "").toString().trim() || `${pkg.volume ?? 0}GB`;
+        const planName = dataAmount;
+        if (!planName) continue;
+        if (allowedPlans && !allowedPlans.has(planName)) continue;
+
+        const basePrice = Number(pkg.console_price ?? 0);
+        if (!Number.isFinite(basePrice) || basePrice <= 0) continue;
+
+        const price = applyMarkup(basePrice, normalized.name, planName);
+        const dataInMB = parseDataAmountToMB(dataAmount) || Math.round(Number(pkg.volume ?? 0) * 1024) || 1024;
+        activePlanNames.add(planName);
+
+        await prisma.dataPlan.upsert({
+          where: { networkId_name: { networkId: network.id, name: planName } },
+          create: {
+            networkId: network.id,
+            name: planName,
+            dataAmount,
+            dataInMB,
+            price,
+            validity: providerNetwork.description ?? "30 days",
+            description: `Provider package ${pkg.id ?? ""}`.trim(),
+            isActive: true,
+            sortOrder: planSort
+          },
+          update: {
+            dataAmount,
+            dataInMB,
+            price,
+            validity: providerNetwork.description ?? "30 days",
+            description: `Provider package ${pkg.id ?? ""}`.trim(),
+            isActive: true,
+            sortOrder: planSort
+          }
+        });
+        plansAdded++;
+        planSort++;
+      }
+
+      if (activePlanNames.size > 0) {
+        await prisma.dataPlan.updateMany({
+          where: {
+            networkId: network.id,
+            name: { notIn: Array.from(activePlanNames) }
+          },
+          data: {
+            isActive: false
+          }
+        });
+      }
+    }
+
+    return { ok: true, networksAdded, plansAdded };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return { ok: false, networksAdded, plansAdded, error: msg };
+  }
 }
 
 async function syncV1NetworksAndPlans(
@@ -1326,6 +1732,24 @@ async function fetchProviderOrderStatusPayload(
   const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
   const providerReference = extractProviderReference(order.apiResponsePayload) ?? order.paymentReference;
   const isGhBundle = isGhBundleBaseUrl(config.baseUrl);
+
+  if (isJaybartProvider(config)) {
+    if (!providerReference) return null;
+    const statusPath = resolveJaybartEndpoint(endpoints.status, JAYBART_ENDPOINT_DEFAULTS.status);
+    try {
+      return await apiRequest<unknown>(config.baseUrl, statusPath, {
+        method: "POST",
+        apiKey: config.apiKey,
+        apiSecret: config.apiSecret ?? undefined,
+        body: {
+          transaction_id: providerReference
+        }
+      });
+    } catch (error) {
+      console.warn("[provider status] Jaybart status lookup failed:", statusPath, error);
+      return null;
+    }
+  }
 
   if (endpoints.status) {
     const statusTemplate = isGhBundle
@@ -1601,6 +2025,53 @@ export const dataProviderService = {
       return { ok: false, networks: [], error: "API configuration not found." };
     }
 
+    if (isJaybartProvider(config)) {
+      try {
+        const [providerNetworks, providerPackages] = await Promise.all([
+          fetchJaybartNetworks(config),
+          fetchJaybartPackages(config)
+        ]);
+        const networkMap = new Map<number, ReturnType<typeof normalizeJaybartNetwork>>();
+        for (const network of providerNetworks) {
+          const normalized = normalizeJaybartNetwork(network);
+          if (normalized.providerNetworkId != null) {
+            networkMap.set(normalized.providerNetworkId, normalized);
+          }
+        }
+
+        const grouped = new Map<string, PreviewNetwork>();
+        for (const pkg of providerPackages) {
+          const networkId = Number(pkg.network_id);
+          const normalized =
+            (Number.isFinite(networkId) ? networkMap.get(networkId) : null) ??
+            normalizeJaybartNetwork({ id: pkg.network_id, name: pkg.network });
+          if (!grouped.has(normalized.name)) {
+            grouped.set(normalized.name, {
+              name: normalized.name,
+              displayName: normalized.displayName,
+              plans: []
+            });
+          }
+          const price = Number(pkg.console_price ?? 0);
+          if (!Number.isFinite(price) || price <= 0) continue;
+          grouped.get(normalized.name)!.plans.push({
+            name: (pkg.volumeGB ?? "").toString().trim() || `${pkg.volume ?? 0}GB`,
+            dataAmount: (pkg.volumeGB ?? "").toString().trim() || `${pkg.volume ?? 0}GB`,
+            price,
+            validity: providerNetworks.find((entry) => Number(entry.id) === networkId)?.description ?? "30 days"
+          });
+        }
+
+        return {
+          ok: true,
+          networks: Array.from(grouped.values()).sort((a, b) => a.displayName.localeCompare(b.displayName))
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        return { ok: false, networks: [], error: msg };
+      }
+    }
+
     if (isV1Provider(config)) {
       return {
         ok: true,
@@ -1799,7 +2270,7 @@ export const dataProviderService = {
 
       return {
         ok: false,
-        message: `No working API endpoint was found under "${baseUrl}". Checked: ${testedPaths.join(", ")}. Jaybart is currently returning 404 for the saved routes, so this base URL likely points to the dashboard or requires custom endpoint paths. Update the test, purchase, and status endpoints in Settings > API Configuration.`
+        message: `No working API endpoint was found under "${baseUrl}". Checked: ${testedPaths.join(", ")}. Update the base URL or custom endpoint paths in Settings > API Configuration.`
       };
     } catch (err) {
       console.error("[testConnection] Error:", err);
@@ -1860,6 +2331,10 @@ export const dataProviderService = {
 
     if (isGhBundleBaseUrl(config.baseUrl)) {
       return syncGhBundleNetworksAndPlans(config, options);
+    }
+
+    if (isJaybartProvider(config)) {
+      return syncJaybartNetworksAndPlans(config, options);
     }
 
     if (isV1Provider(config)) {
@@ -2101,13 +2576,18 @@ export const dataProviderService = {
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
     // Detect GhBundle API (direct or proxy URLs)
     const isGhBundle = isGhBundleBaseUrl(config.baseUrl);
+    const isJaybart = isJaybartProvider(config);
     const isV1 = isV1Provider(config);
     const purchasePaths = isGhBundle
       ? [resolveGhBundleEndpoint(endpoints.purchase, "/orders")]
+      : isJaybart
+        ? [resolveJaybartEndpoint(endpoints.purchase, JAYBART_ENDPOINT_DEFAULTS.purchase)]
       : isV1
         ? getV1PurchaseCandidatePaths(endpoints)
         : [endpoints.purchase ?? "/api/purchase"];
-    const purchaseMethod = endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
+    const purchaseMethod = isJaybart
+      ? JAYBART_ENDPOINT_DEFAULTS.purchaseMethod
+      : endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
 
     let payload: object;
     let v1PayloadCandidates: V1PurchasePayload[] | null = null;
@@ -2181,6 +2661,18 @@ export const dataProviderService = {
         client_order_id: order.orderNumber
       };
       console.log("[fulfillOrder] GhBundle payload:", JSON.stringify(payload));
+    } else if (isJaybart) {
+      const resolvedNetwork = resolveJaybartNetworkConfig(order.network);
+      payload = {
+        recipient_msisdn: toLocalGhanaPhone(order.recipientNumber),
+        network_id: resolvedNetwork.providerNetworkId ?? 3,
+        shared_bundle: resolveJaybartSharedBundle(order.dataPlan)
+      };
+      console.log("[fulfillOrder] Jaybart payload:", JSON.stringify({
+        ...payload,
+        resolvedNetwork: resolvedNetwork.name,
+        providerNetworkName: resolvedNetwork.providerName
+      }));
     } else if (isV1) {
       const resolvedNetwork = resolveV1Network(order.network?.name);
       const size = resolveV1PlanSize(resolvedNetwork.name, {
@@ -2317,7 +2809,7 @@ export const dataProviderService = {
               lastPathError = attemptError;
               break;
             }
-            if (isV1 && status === 404 && pathIndex < purchasePaths.length - 1) {
+            if ((isV1 || isJaybart) && status === 404 && pathIndex < purchasePaths.length - 1) {
               lastPathError = attemptError;
               continue;
             }

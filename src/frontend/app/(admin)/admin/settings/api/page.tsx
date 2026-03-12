@@ -36,6 +36,21 @@ const EMPTY_ENDPOINTS: ApiEndpoints = {
   status: "",
   purchaseMethod: "POST"
 };
+const GENERIC_LEGACY_ENDPOINTS = new Set([
+  "",
+  "/",
+  "/normal-orders",
+  "/orders",
+  "/purchase",
+  "/data-orders",
+  "/services",
+  "/balance",
+  "/me",
+  "/profile",
+  "/api/networks",
+  "/api/plans",
+  "/api/purchase"
+]);
 
 function isGhBundleUrl(url: string): boolean {
   return /ghbundle\.com|ghbundle-reseller-api-proxy/i.test(url);
@@ -63,10 +78,14 @@ function getProviderDefaults(baseUrl: string) {
 
   if (isJaybartUrl(baseUrl)) {
     return {
-      provider: "v1",
+      provider: "jaybart",
       name: "Jaybart API",
       endpoints: {
-        ...EMPTY_ENDPOINTS,
+        networks: "/fetch-networks",
+        plans: "/fetch-data-packages",
+        purchase: "/buy-other-package",
+        test: "/check-console-balance",
+        status: "/fetch-other-network-transaction",
         purchaseMethod: "POST" as const
       }
     };
@@ -84,14 +103,23 @@ function getProviderDefaults(baseUrl: string) {
   };
 }
 
+function normalizeEndpointValue(baseUrl: string, value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return fallback;
+  if (isJaybartUrl(baseUrl) && GENERIC_LEGACY_ENDPOINTS.has(trimmed.toLowerCase())) {
+    return fallback;
+  }
+  return trimmed;
+}
+
 function mergeEndpointInputs(baseUrl: string, input: ApiEndpoints): ApiEndpoints {
   const defaults = getProviderDefaults(baseUrl).endpoints;
   return {
-    networks: input.networks.trim() || defaults.networks || "",
-    plans: input.plans.trim() || defaults.plans || "",
-    purchase: input.purchase.trim() || defaults.purchase || "",
-    test: input.test.trim() || defaults.test || "",
-    status: input.status.trim() || defaults.status || "",
+    networks: normalizeEndpointValue(baseUrl, input.networks, defaults.networks || ""),
+    plans: normalizeEndpointValue(baseUrl, input.plans, defaults.plans || ""),
+    purchase: normalizeEndpointValue(baseUrl, input.purchase, defaults.purchase || ""),
+    test: normalizeEndpointValue(baseUrl, input.test, defaults.test || ""),
+    status: normalizeEndpointValue(baseUrl, input.status, defaults.status || ""),
     purchaseMethod: input.purchaseMethod
   };
 }
@@ -127,6 +155,7 @@ export default function Page() {
   const connected = configs.length > 0;
   const activeConfig = configs.find((c) => c.isActive);
   const ghBundleMode = isGhBundleUrl(baseUrl);
+  const jaybartMode = isJaybartUrl(baseUrl);
   const statusLabel = !activeConfig
     ? "Not Connected"
     : serviceStatus?.ok === true
@@ -178,15 +207,20 @@ export default function Page() {
 
   useEffect(() => {
     if (activeConfig?.baseUrl) {
+      const defaults = getProviderDefaults(activeConfig.baseUrl).endpoints;
       setBaseUrl(activeConfig.baseUrl);
       setEndpoints({
         ...EMPTY_ENDPOINTS,
-        ...getProviderDefaults(activeConfig.baseUrl).endpoints,
-        ...(activeConfig.endpoints ?? {}),
+        ...defaults,
+        networks: normalizeEndpointValue(activeConfig.baseUrl, activeConfig.endpoints?.networks, defaults.networks || ""),
+        plans: normalizeEndpointValue(activeConfig.baseUrl, activeConfig.endpoints?.plans, defaults.plans || ""),
+        purchase: normalizeEndpointValue(activeConfig.baseUrl, activeConfig.endpoints?.purchase, defaults.purchase || ""),
+        test: normalizeEndpointValue(activeConfig.baseUrl, activeConfig.endpoints?.test, defaults.test || ""),
+        status: normalizeEndpointValue(activeConfig.baseUrl, activeConfig.endpoints?.status, defaults.status || ""),
         purchaseMethod:
           activeConfig.endpoints?.purchaseMethod === "GET" || activeConfig.endpoints?.purchaseMethod === "POST"
             ? activeConfig.endpoints.purchaseMethod
-            : getProviderDefaults(activeConfig.baseUrl).endpoints.purchaseMethod
+            : defaults.purchaseMethod
       });
     }
   }, [activeConfig]);
@@ -489,6 +523,9 @@ export default function Page() {
               <p className="mt-1 text-xs text-slate-400">Paste your provider token (include a prefix like &quot;Token&quot; or &quot;Bearer&quot; if required).</p>
               {ghBundleMode ? (
                 <p className="mt-1 text-xs text-[#2563eb]">GhBundle uses token auth. A valid API token is enough.</p>
+              ) : null}
+              {jaybartMode ? (
+                <p className="mt-1 text-xs text-[#2563eb]">Jaybart uses the `x-api-key` header with the raw API key.</p>
               ) : null}
             </div>
             <div>
