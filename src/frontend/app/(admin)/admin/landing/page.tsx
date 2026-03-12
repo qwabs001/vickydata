@@ -142,7 +142,7 @@ export default function Page() {
                   popularBundles: { ...prev.popularBundles, ctaUrl: event.target.value }
                 }))
               }
-              placeholder="https://360promo.uk"
+              placeholder="https://malonsocial.com/"
             />
           </div>
           <div className="rounded-2xl border border-slate-200 bg-[#f8fafc] p-4">
@@ -156,7 +156,7 @@ export default function Page() {
                   popularBundles: { ...prev.popularBundles, buyNowUrl: event.target.value }
                 }))
               }
-              placeholder="https://360promo.uk/#/dashboard"
+              placeholder="https://malonsocial.com/"
             />
           </div>
         </div>

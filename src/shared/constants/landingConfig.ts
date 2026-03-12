@@ -6,8 +6,8 @@ export const defaultLandingConfig: LandingConfig = {
     title: "Need more Engagements?",
     subtitle: "Try our social media Marketing Services (SMM).",
     ctaText: "View All Plans",
-    ctaUrl: "https://360promo.uk",
-    buyNowUrl: "https://360promo.uk/#/dashboard",
+    ctaUrl: "https://malonsocial.com/",
+    buyNowUrl: "https://malonsocial.com/",
     items: [
       {
         id: "tiktok-services",
