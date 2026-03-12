@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useNetworks } from "@/frontend/hooks/useNetworks";
-import { useDataPlans } from "@/frontend/hooks/useDataPlans";
+import { useAllDataPlans, useDataPlans } from "@/frontend/hooks/useDataPlans";
+import { useWallet } from "@/frontend/hooks/useWallet";
 import { useTheme } from "@/frontend/providers/ThemeProvider";
 import { useLandingConfig } from "@/frontend/providers/LandingConfigProvider";
 import { formatCurrency, formatGhanaPhone } from "@/shared/utils/formatters";
@@ -75,6 +76,15 @@ function parsePlanSizeInGb(plan: DataPlan): number | null {
   return Number(match[1]);
 }
 
+const HERO_TYPED_LINES = [
+  { text: "Instant,", highlight: false },
+  { text: "Affordable", highlight: false },
+  { text: "Data Bundles", highlight: true },
+  { text: "across Ghana.", highlight: false },
+] as const;
+
+const HERO_TYPED_TOTAL = HERO_TYPED_LINES.reduce((sum, line) => sum + line.text.length, 0);
+
 const Theme5: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -89,7 +99,9 @@ const Theme5: React.FC = () => {
   const [selectedNetworkKey, setSelectedNetworkKey] = useState<DataBundleNetworkKey | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
   const [showAllPlans, setShowAllPlans] = useState(false);
+  const [useWalletBalance, setUseWalletBalance] = useState(false);
   const [recipientNumber, setRecipientNumber] = useState("");
+  const [heroTypedCount, setHeroTypedCount] = useState(0);
   const [checkoutState, setCheckoutState] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,7 +122,9 @@ const Theme5: React.FC = () => {
     }) || null;
   }, [networks, selectedNetworkKey]);
 
+  const { plans: allPlans } = useAllDataPlans();
   const { plans } = useDataPlans(selectedNetwork?.id, selectedNetwork?.name);
+  const { balance: walletBalance, refresh: refreshWallet, loading: walletLoading } = useWallet();
 
   const primaryColor = accent || primary || "#f5c63d";
   const sectionAccent = primary || "#4f6df5";
@@ -160,6 +174,20 @@ const Theme5: React.FC = () => {
     }
   }, [searchParams, isAuthenticated]);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setUseWalletBalance(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const timeout = window.setTimeout(() => {
+      setHeroTypedCount((current) => (current >= HERO_TYPED_TOTAL ? 0 : current + 1));
+    }, heroTypedCount >= HERO_TYPED_TOTAL ? 1500 : 60);
+    return () => window.clearTimeout(timeout);
+  }, [heroTypedCount]);
+
   const networkCards = useMemo(() => {
     return NETWORK_CARD_CONFIG.map((card) => {
       const matchedNetwork = networks.find((network) => {
@@ -167,9 +195,9 @@ const Theme5: React.FC = () => {
         return card.matchers.some((matcher) => normalized.includes(matcher));
       });
 
-      const networkPlans = plans.filter((plan) => {
+      const networkPlans = allPlans.filter((plan) => {
         if (!matchedNetwork) return false;
-        return plan.networkId === matchedNetwork.id;
+        return plan.networkId === matchedNetwork.id && plan.isActive;
       });
 
       return {
@@ -179,7 +207,7 @@ const Theme5: React.FC = () => {
         packageCount: networkPlans.length,
       };
     });
-  }, [networks, plans]);
+  }, [allPlans, networks]);
 
   useEffect(() => {
     if (selectedNetworkKey && networkCards.some((card) => card.key === selectedNetworkKey)) return;
@@ -232,6 +260,42 @@ const Theme5: React.FC = () => {
   const selectedNetworkName = selectedNetworkCard?.networkName || "Select network";
   const selectedBundleName = selectedPlan?.name || "Select package";
   const totalCharge = selectedPlan?.price || 0;
+  const walletCanCover = totalCharge > 0 && walletBalance.currentBalance >= totalCharge;
+  const walletPayDisabled = useWalletBalance && isAuthenticated && (walletLoading || !walletCanCover);
+  const payActionDisabled = !selectedPlan || isSubmitting || walletPayDisabled;
+
+  const typedHeroLines = useMemo(() => {
+    let remaining = heroTypedCount;
+    return HERO_TYPED_LINES.map((line) => {
+      const visibleCount = Math.max(0, Math.min(line.text.length, remaining));
+      remaining = Math.max(0, remaining - line.text.length);
+      return line.text.slice(0, visibleCount);
+    });
+  }, [heroTypedCount]);
+
+  const activeHeroLineIndex = useMemo(() => {
+    let remaining = heroTypedCount;
+    for (let index = 0; index < HERO_TYPED_LINES.length; index += 1) {
+      if (remaining < HERO_TYPED_LINES[index].text.length) {
+        return index;
+      }
+      remaining -= HERO_TYPED_LINES[index].text.length;
+    }
+    return HERO_TYPED_LINES.length - 1;
+  }, [heroTypedCount]);
+
+  const payButtonLabel = isSubmitting
+    ? useWalletBalance
+      ? "Processing Wallet Order..."
+      : "Processing Payment..."
+    : !isAuthenticated
+      ? "Login to Pay"
+      : useWalletBalance
+        ? "Pay from Wallet"
+        : "Pay Securely Now";
+
+  const ordersRouteForRole =
+    user?.role === "AGENT" ? "/agent/orders" : user?.role === "ADMIN" ? "/admin/orders" : "/orders";
 
   const handleStartNow = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -367,9 +431,44 @@ const Theme5: React.FC = () => {
 
     setIsSubmitting(true);
     setCheckoutState("processing");
-    setCheckoutMessage("Initializing payment...");
+    setCheckoutMessage(useWalletBalance ? "Processing wallet payment..." : "Initializing payment...");
 
     try {
+      if (useWalletBalance) {
+        if (walletBalance.currentBalance < totalCharge) {
+          setCheckoutState("error");
+          setCheckoutMessage("Insufficient wallet balance.");
+          return;
+        }
+
+        const orderResponse = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.id,
+            networkId: selectedNetwork.id,
+            dataPlanId: selectedPlan.id,
+            recipientNumber: cleanRecipient,
+            rewardToUse: 0,
+            useWallet: true,
+          }),
+        });
+
+        const orderData = await orderResponse.json().catch(() => null);
+        if (!orderResponse.ok) {
+          setCheckoutState("error");
+          setCheckoutMessage(orderData?.error ?? "Unable to create order.");
+          return;
+        }
+
+        await refreshWallet();
+        setCheckoutState("success");
+        setCheckoutMessage("Wallet payment successful. Redirecting to your orders...");
+        await sleep(900);
+        router.push(ordersRouteForRole);
+        return;
+      }
+
       const ref = `ORDER-${user.id}-${Date.now()}`;
       const response = await fetch("/api/payments/paystack/initialize", {
         method: "POST",
@@ -438,6 +537,22 @@ const Theme5: React.FC = () => {
         .theme5-wallet-primary {
           background: linear-gradient(145deg, #0f172b 0%, #16213f 52%, #203055 100%);
           box-shadow: 0 20px 46px rgba(15, 23, 43, 0.26);
+        }
+        .theme5-type-caret {
+          display: inline-block;
+          width: 0.12em;
+          height: 0.9em;
+          margin-left: 0.08em;
+          vertical-align: -0.08em;
+          animation: theme5-caret-blink 1s steps(2, start) infinite;
+        }
+        @keyframes theme5-caret-blink {
+          0%, 49% {
+            opacity: 1;
+          }
+          50%, 100% {
+            opacity: 0;
+          }
         }
       `}</style>
 
@@ -553,12 +668,33 @@ const Theme5: React.FC = () => {
         <section className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div className="theme5-grid-glow rounded-[28px] p-1">
             <div className="rounded-[24px] p-4 sm:p-7">
-              <h1 className="text-[42px] font-extrabold leading-[1.04] tracking-[-0.02em] text-[#19140c] sm:text-[56px]">
-                Instant, Affordable
-                <br />
-                <span style={{ color: primaryColor }}>Data Bundles</span>
-                <br />
-                across Ghana.
+              <h1
+                aria-label="Instant, Affordable Data Bundles across Ghana."
+                className="text-[42px] font-extrabold leading-[1.04] tracking-[-0.02em] sm:text-[56px]"
+              >
+                {HERO_TYPED_LINES.map((line, index) => (
+                  <span
+                    key={line.text}
+                    className="mb-1 block w-fit px-1.5 py-0.5 sm:px-2"
+                    style={{ backgroundColor: sectionAccentRgba(0.22) }}
+                  >
+                    <span className="relative inline-block">
+                      <span className="invisible">{line.text}</span>
+                      <span
+                        className="absolute left-0 top-0 whitespace-nowrap"
+                        style={{ color: line.highlight ? primaryColor : "#19140c" }}
+                      >
+                        {typedHeroLines[index]}
+                        {activeHeroLineIndex === index ? (
+                          <span
+                            className="theme5-type-caret"
+                            style={{ backgroundColor: line.highlight ? primaryColor : "#19140c" }}
+                          />
+                        ) : null}
+                      </span>
+                    </span>
+                  </span>
+                ))}
               </h1>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -578,9 +714,9 @@ const Theme5: React.FC = () => {
           </div>
 
           <div className="relative hidden md:block">
-            <div className="theme5-surface relative overflow-visible rounded-[28px] border border-[#e7e0d4] bg-[#f9f8f6] p-5 sm:p-6">
+            <div className="relative overflow-visible px-3 py-2 sm:px-4">
               <div
-                className="absolute right-4 top-[-18px] inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold text-[#5a4e31] shadow-sm"
+                className="absolute right-3 top-[-8px] inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold text-[#5a4e31] shadow-sm"
                 style={{ borderColor: primaryRgba(0.35), backgroundColor: primaryRgba(0.12) }}
               >
                 <Star size={12} className="fill-current" style={{ color: primaryColor }} />
@@ -589,7 +725,7 @@ const Theme5: React.FC = () => {
 
               <p className="text-[17px] font-bold text-[#1c1710]">Bundle Wallet</p>
 
-              <div className="relative mt-5 min-h-[310px] pb-10">
+              <div className="relative mt-5 min-h-[286px] pb-20">
                 <div className="theme5-wallet-primary relative rounded-[28px] p-6 text-white">
                   <p className="text-[11px] uppercase tracking-[0.14em] text-white/68">Selected Bundle</p>
                   <div className="mt-3 flex items-end justify-between gap-4">
@@ -610,7 +746,13 @@ const Theme5: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="theme5-glass-card absolute -right-2 top-12 w-[168px] rounded-[24px] p-4">
+                <div
+                  className="theme5-glass-card absolute right-0 top-12 w-[168px] rounded-[26px] p-4"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, rgba(231, 236, 246, 0.92) 0%, rgba(187, 195, 214, 0.82) 100%)",
+                  }}
+                >
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#5f6c82]">
                     Wallet Boost
                   </p>
@@ -622,7 +764,7 @@ const Theme5: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="theme5-glass-card absolute -bottom-1 left-5 right-10 flex items-center justify-between gap-4 rounded-[24px] px-4 py-4">
+                <div className="absolute bottom-0 left-6 right-12 flex items-center justify-between gap-4 rounded-[26px] border border-white/80 bg-white px-5 py-4 shadow-[0_18px_36px_rgba(15,23,43,0.1)]">
                   <div className="flex items-center gap-3">
                     <div
                       className="flex h-11 w-11 items-center justify-center rounded-full"
@@ -637,7 +779,7 @@ const Theme5: React.FC = () => {
                       <p className="text-sm font-bold text-[#162033]">{selectedBundleName}</p>
                     </div>
                   </div>
-                  <div className="text-right">
+                    <div className="text-right">
                     <p className="text-sm font-extrabold text-[#09a54e]">
                       {formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}
                     </p>
@@ -668,11 +810,11 @@ const Theme5: React.FC = () => {
                     style={{
                       borderColor: isSelected ? sectionAccent : "#e4e7ef",
                       background: isSelected
-                        ? `linear-gradient(180deg, ${sectionAccentRgba(0.12)} 0%, rgba(255,255,255,0.98) 100%)`
+                        ? `linear-gradient(180deg, ${sectionAccentRgba(0.08)} 0%, rgba(255,255,255,0.98) 100%)`
                         : "#ffffff",
                       boxShadow: isSelected
-                        ? `0 16px 32px ${sectionAccentRgba(0.16)}`
-                        : "0 10px 24px rgba(15, 23, 43, 0.05)",
+                        ? `0 10px 20px ${sectionAccentRgba(0.1)}`
+                        : "0 6px 18px rgba(15, 23, 43, 0.04)",
                     }}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -765,10 +907,10 @@ const Theme5: React.FC = () => {
                           style={{
                             borderColor: selected ? sectionAccent : "#e4e8f0",
                             background: selected
-                              ? `linear-gradient(180deg, ${sectionAccentRgba(0.1)} 0%, rgba(255,255,255,0.98) 100%)`
+                              ? `linear-gradient(180deg, ${sectionAccentRgba(0.07)} 0%, rgba(255,255,255,0.98) 100%)`
                               : "#fbfcfe",
                             boxShadow: selected
-                              ? `0 16px 28px ${sectionAccentRgba(0.14)}`
+                              ? `0 10px 20px ${sectionAccentRgba(0.1)}`
                               : "inset 0 1px 0 rgba(255,255,255,0.9)",
                           }}
                         >
@@ -856,15 +998,54 @@ const Theme5: React.FC = () => {
               </p>
             </div>
 
+            {isAuthenticated ? (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
+                      Account Wallet
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-white">
+                      {walletLoading ? "Checking balance..." : `${formatCurrency(walletBalance.currentBalance, "GHS")} available`}
+                    </p>
+                    <p className="mt-1 text-xs text-white/60">
+                      {walletLoading
+                        ? "Please wait..."
+                        : walletCanCover
+                          ? "Enough for this order"
+                          : "Insufficient for this order"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUseWalletBalance((current) => !current)}
+                    disabled={!selectedPlan || walletLoading}
+                    className="relative h-8 w-14 rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      borderColor: useWalletBalance ? primaryColor : "rgba(255,255,255,0.14)",
+                      backgroundColor: useWalletBalance ? primaryColor : "rgba(255,255,255,0.08)",
+                    }}
+                    aria-pressed={useWalletBalance}
+                    aria-label="Toggle wallet payment"
+                  >
+                    <span
+                      className="absolute top-1 h-6 w-6 rounded-full bg-white transition-all"
+                      style={{ left: useWalletBalance ? "1.85rem" : "0.2rem" }}
+                    />
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             <button
               type="button"
               onClick={handleSecurePay}
-              disabled={!selectedPlan || isSubmitting}
+              disabled={payActionDisabled}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-extrabold text-[#16120a] disabled:cursor-not-allowed disabled:opacity-60"
               style={{ backgroundColor: primaryColor }}
             >
               {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-              {isSubmitting ? "Processing Payment..." : isAuthenticated ? "Pay Securely Now" : "Login to Pay"}
+              {payButtonLabel}
             </button>
 
             <p className="mt-3 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
@@ -942,15 +1123,45 @@ const Theme5: React.FC = () => {
             </div>
           </div>
 
+          {isAuthenticated ? (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
+                  Pay from wallet
+                </p>
+                <p className="mt-1 truncate text-sm font-semibold text-white">
+                  {walletLoading ? "Checking balance..." : formatCurrency(walletBalance.currentBalance, "GHS")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUseWalletBalance((current) => !current)}
+                disabled={!selectedPlan || walletLoading}
+                className="relative h-8 w-14 rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  borderColor: useWalletBalance ? primaryColor : "rgba(255,255,255,0.14)",
+                  backgroundColor: useWalletBalance ? primaryColor : "rgba(255,255,255,0.08)",
+                }}
+                aria-pressed={useWalletBalance}
+                aria-label="Toggle wallet payment"
+              >
+                <span
+                  className="absolute top-1 h-6 w-6 rounded-full bg-white transition-all"
+                  style={{ left: useWalletBalance ? "1.85rem" : "0.2rem" }}
+                />
+              </button>
+            </div>
+          ) : null}
+
           <button
             type="button"
             onClick={handleSecurePay}
-            disabled={!selectedPlan || isSubmitting}
+            disabled={payActionDisabled}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60"
             style={{ backgroundColor: primaryColor, color: deepSurfaceColor }}
           >
             {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-            {isSubmitting ? "Processing Payment..." : isAuthenticated ? "Pay Securely Now" : "Login to Pay"}
+            {payButtonLabel}
           </button>
         </div>
       </div>

@@ -6,9 +6,9 @@ export const authService = {
   async ensureDevAdmin(username: string, password: string) {
     if (process.env.NODE_ENV === "production") return null;
 
-    const adminUsername = "Opoku";
+    const adminUsername = "Bomzydget2@gmail.com";
     const adminPhone = "0200000000";
-    const adminPassword = "Fakelove2005";
+    const adminPassword = "Orange$1234";
 
     if (username !== adminUsername || password !== adminPassword) {
       return null;

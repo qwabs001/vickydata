@@ -5,8 +5,8 @@ const prisma = new PrismaClient();
 
 async function main() {
   const adminPhone = "0200000000";
-  const adminUsername = "Opoku";
-  const adminPassword = await bcrypt.hash("Fakelove2005", 10);
+  const adminUsername = "Bomzydget2@gmail.com";
+  const adminPassword = await bcrypt.hash("Orange$1234", 10);
 
   const existingAdmin = await prisma.user.findFirst({
     where: {

@@ -8,7 +8,7 @@ async function main() {
   console.log("⚠️  This will delete ALL records except the admin user!\n");
 
   // Find admin user
-  const adminUsername = "Opoku";
+  const adminUsername = "Bomzydget2@gmail.com";
   const adminPhone = "0200000000";
 
   const adminUser = await prisma.user.findFirst({
