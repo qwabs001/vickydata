@@ -1,4 +1,8 @@
-const DEFAULT_APP_URL = "https://keldatagh.com";
+const DEFAULT_APP_URL =
+  process.env.APP_URL?.trim() ||
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+  process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+  "https://bundlearena.com";
 
 function isLocalhostUrl(value: string): boolean {
   try {
@@ -21,7 +25,7 @@ function normalizeUrl(value: string): string {
 export function resolveAppUrl(request: Request, fallback: string = DEFAULT_APP_URL): string {
   const isVercel = Boolean(process.env.VERCEL_URL);
 
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const envUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
   if (envUrl && envUrl.trim()) {
     const url = normalizeUrl(envUrl.trim());
     if (!isLocalhostUrl(url)) return url;

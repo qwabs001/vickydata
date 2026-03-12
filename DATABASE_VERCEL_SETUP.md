@@ -6,22 +6,23 @@ To enable your Supabase database to communicate with Vercel, you need to set the
 
 ### 1. Database Connection Strings (REQUIRED)
 
-#### Option A: Session Pooler (Recommended for Vercel)
+#### Option A: Session Pooler (Legacy / not recommended for Vercel)
 ```env
-DATABASE_URL=postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
-DIRECT_DATABASE_URL=postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
+DATABASE_URL=postgresql://postgres.kbzdbwaahfcxutelbmnm:PASSWORD@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1
+DIRECT_DATABASE_URL=postgresql://postgres.kbzdbwaahfcxutelbmnm:PASSWORD@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
-#### Option B: Transaction Pooler (Alternative - Port 6543)
+#### Option B: Transaction Pooler (Recommended - Port 6543)
 ```env
-DATABASE_URL=postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
-DIRECT_DATABASE_URL=postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
+DATABASE_URL=postgresql://postgres.kbzdbwaahfcxutelbmnm:PASSWORD@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
+DIRECT_DATABASE_URL=postgresql://postgres.kbzdbwaahfcxutelbmnm:PASSWORD@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
 ### 2. Supabase Configuration (REQUIRED)
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://yezeyzqalpiefanrosws.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllemV5enFhbHBpZWZhbnJvc3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MDYzOTcsImV4cCI6MjA4NzA4MjM5N30.0ezTudXLlZ_6_wFoXM2dmJdzOHzKZHmmYRRHOF4aoIA
+NEXT_PUBLIC_SUPABASE_URL=https://kbzdbwaahfcxutelbmnm.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_BwxSgxfY_P4Dc0sZ8uptsg_g6a0yZzZ
 ```
 
 ### 3. NextAuth Configuration (REQUIRED)
@@ -32,15 +33,18 @@ NEXTAUTH_URL=https://your-domain.vercel.app
 
 ### 4. App Configuration (REQUIRED)
 ```env
+APP_URL=https://bundlearena.com
+APP_NAME=BundleArena
 NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
-NEXT_PUBLIC_APP_NAME=Keldatagh
+NEXT_PUBLIC_SITE_URL=https://bundlearena.com
+NEXT_PUBLIC_APP_NAME=BundleArena
 NODE_ENV=production
 ```
 
 ## How to Set Environment Variables in Vercel
 
 1. Go to your Vercel Dashboard: https://vercel.com/dashboard
-2. Select your project: **keldatagh**
+2. Select your project: **bundlearena**
 3. Navigate to **Settings** → **Environment Variables**
 4. Add each variable above:
    - **Key**: `DATABASE_URL`
@@ -105,16 +109,16 @@ After setting environment variables in Vercel:
 - ✅ Check `DIRECT_DATABASE_URL` is set
 - ✅ Try using direct connection URL for migrations:
   ```env
-  DIRECT_DATABASE_URL=postgresql://postgres:globNFK8uziL24H7@db.yezeyzqalpiefanrosws.supabase.co:5432/postgres?sslmode=require
+  DIRECT_DATABASE_URL=postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require
   ```
 
 ## Current Configuration Summary
 
 Based on your project:
-- **Project Reference**: `yezeyzqalpiefanrosws`
+- **Project Reference**: `kbzdbwaahfcxutelbmnm`
 - **Region**: `aws-1-eu-west-1`
-- **Connection Type**: Session Pooler (port 5432)
-- **Password**: `globNFK8uziL24H7`
+- **Connection Type**: Transaction Pooler (port 6543)
+- **Password**: `PASSWORD`
 
 ## Quick Setup Checklist
 
@@ -122,6 +126,7 @@ Based on your project:
 - [ ] Set `DIRECT_DATABASE_URL` in Vercel environment variables
 - [ ] Set `NEXT_PUBLIC_SUPABASE_URL` in Vercel
 - [ ] Set `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel
+- [ ] Set `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in Vercel
 - [ ] Set `NEXTAUTH_SECRET` in Vercel (generate new secret)
 - [ ] Set `NEXTAUTH_URL` to your Vercel domain
 - [ ] Set `NEXT_PUBLIC_APP_URL` to your Vercel domain

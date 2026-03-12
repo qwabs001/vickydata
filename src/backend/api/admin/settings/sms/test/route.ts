@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Phone number required.", ok: false }, { status: 400 });
     }
 
-    const result = await sendSms(phone, "Keldatagh SMS test: Your SMS is working!");
+    const result = await sendSms(phone, "BundleArena SMS test: Your SMS is working!");
     return NextResponse.json({
       ok: result.ok,
       message: result.ok ? "SMS sent." : result.error

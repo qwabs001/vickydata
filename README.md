@@ -1,4 +1,4 @@
-# Keldatagh
+# BundleArena
 
 Ultra-simple data bundle purchasing platform for Ghana.
 

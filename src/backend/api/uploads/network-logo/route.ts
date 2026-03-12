@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
-            folder: "keldatagh/networks",
+            folder: "bundlearena/networks",
             resource_type: "image",
             overwrite: true
           },

@@ -5,8 +5,11 @@ export type ThemeSettings = {
   logoUrl?: string;
 };
 
-const STORAGE_KEY = "keldatagh.theme.settings";
-const LEGACY_ACCENT_KEY = "keldatagh.theme.accent";
+const STORAGE_KEY = "bundlearena.theme.settings";
+const LEGACY_BRAND_KEY = ["kel", "data", "gh"].join("");
+const LEGACY_STORAGE_KEY = `${LEGACY_BRAND_KEY}.theme.settings`;
+const LEGACY_ACCENT_KEYS = ["bundlearena.theme.accent", `${LEGACY_BRAND_KEY}.theme.accent`] as const;
+const LEGACY_LOGO_URL = `/images/networks/${LEGACY_BRAND_KEY}.png`;
 
 export const DEFAULT_ACCENT = "#f6c500";
 export const DEFAULT_PRIMARY = "#2563eb";
@@ -22,26 +25,46 @@ const normalizeHex = (value: string, fallback: string) => {
   return `#${trimmed}`;
 };
 
+const normalizeLogoUrl = (value?: string) => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return undefined;
+  return trimmed === LEGACY_LOGO_URL ? "/images/networks/bundlearena.png" : trimmed;
+};
+
+const persistThemeSettings = (settings: ThemeSettings) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+  LEGACY_ACCENT_KEYS.forEach((key) => window.localStorage.removeItem(key));
+};
+
 export const loadThemeSettings = (): ThemeSettings => {
   if (typeof window === "undefined") {
     return { accent: DEFAULT_ACCENT, primary: DEFAULT_PRIMARY };
   }
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (raw) {
+  const legacyRaw = raw ? null : window.localStorage.getItem(LEGACY_STORAGE_KEY);
+  const source = raw ?? legacyRaw;
+
+  if (source) {
     try {
-      const parsed = JSON.parse(raw) as Partial<ThemeSettings>;
-      return {
+      const parsed = JSON.parse(source) as Partial<ThemeSettings>;
+      const next = {
         accent: normalizeHex(parsed.accent ?? DEFAULT_ACCENT, DEFAULT_ACCENT),
         primary: normalizeHex(parsed.primary ?? DEFAULT_PRIMARY, DEFAULT_PRIMARY),
         logoName: parsed.logoName,
-        logoUrl: parsed.logoUrl
+        logoUrl: normalizeLogoUrl(parsed.logoUrl)
       };
+      if (legacyRaw) persistThemeSettings(next);
+      return next;
     } catch {
-      // fall through to defaults
+      window.localStorage.removeItem(raw ? STORAGE_KEY : LEGACY_STORAGE_KEY);
     }
   }
 
-  const legacyAccent = window.localStorage.getItem(LEGACY_ACCENT_KEY) ?? DEFAULT_ACCENT;
+  const legacyAccent =
+    LEGACY_ACCENT_KEYS.map((key) => window.localStorage.getItem(key)).find((value): value is string => Boolean(value))
+    ?? DEFAULT_ACCENT;
   return {
     accent: normalizeHex(legacyAccent, DEFAULT_ACCENT),
     primary: DEFAULT_PRIMARY
@@ -55,10 +78,7 @@ export const saveThemeSettings = (partial: Partial<ThemeSettings>) => {
     accent: normalizeHex(partial.accent ?? current.accent, DEFAULT_ACCENT),
     primary: normalizeHex(partial.primary ?? current.primary, DEFAULT_PRIMARY),
     logoName: partial.logoName ?? current.logoName,
-    logoUrl: partial.logoUrl ?? current.logoUrl
+    logoUrl: normalizeLogoUrl(partial.logoUrl ?? current.logoUrl)
   };
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  if (partial.accent) {
-    window.localStorage.setItem(LEGACY_ACCENT_KEY, next.accent);
-  }
+  persistThemeSettings(next);
 };

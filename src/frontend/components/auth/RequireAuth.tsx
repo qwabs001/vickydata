@@ -11,6 +11,8 @@ interface RequireAuthProps {
   role?: UserRole;
 }
 
+const LEGACY_AUTH_STORAGE_KEY = `${["kel", "data", "gh"].join("")}.auth`;
+
 export function RequireAuth({ children, role }: RequireAuthProps) {
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
@@ -55,7 +57,8 @@ export function RequireAuth({ children, role }: RequireAuthProps) {
                 phoneNumber: profile.phoneNumber ?? user.phoneNumber,
                 role: profile.role
               };
-              window.localStorage.setItem("keldatagh.auth", JSON.stringify(nextUser));
+              window.localStorage.setItem("bundlearena.auth", JSON.stringify(nextUser));
+              window.localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
               window.location.reload();
             }
             return;

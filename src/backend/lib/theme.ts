@@ -3,7 +3,8 @@ import { prisma } from "@/backend/lib/db/prisma";
 
 const LOGO_KEY = "brand.logo";
 const THEME_KEY = "brand.theme";
-const DEFAULT_LOGO_URL = "/images/networks/keldatagh.png";
+const DEFAULT_LOGO_URL = "/images/networks/bundlearena.png";
+const LEGACY_LOGO_URL = `/images/networks/${["kel", "data", "gh"].join("")}.png`;
 
 export const DEFAULT_ACCENT = "#f6c500";
 export const DEFAULT_PRIMARY = "#2563eb";
@@ -40,10 +41,11 @@ export const getBrandTheme = cache(async (): Promise<BrandTheme> => {
     const logoValue = logoSetting?.value as { logoUrl?: string } | null;
     const themeValue = themeSetting?.value as { accent?: string; primary?: string } | null;
 
+    const resolvedLogoUrl = (logoValue?.logoUrl ?? "").trim();
     return {
       accent: themeValue?.accent ?? DEFAULT_ACCENT,
       primary: themeValue?.primary ?? DEFAULT_PRIMARY,
-      logoUrl: (logoValue?.logoUrl ?? "").trim() || DEFAULT_LOGO_URL
+      logoUrl: resolvedLogoUrl === LEGACY_LOGO_URL ? DEFAULT_LOGO_URL : resolvedLogoUrl || DEFAULT_LOGO_URL
     };
   } catch (error) {
     console.error("Brand theme fetch error:", error);

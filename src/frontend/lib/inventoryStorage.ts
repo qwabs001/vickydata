@@ -6,7 +6,8 @@ export type StoredPlan = {
   featured: boolean;
 };
 
-const DATA_PLANS_KEY = "keldatagh:dataPlans";
+const DATA_PLANS_KEY = "bundlearena:dataPlans";
+const LEGACY_DATA_PLANS_KEY = `${["kel", "data", "gh"].join("")}:dataPlans`;
 
 const safeParseArray = <T,>(raw: string | null): T[] | null => {
   if (!raw) return null;
@@ -20,10 +21,18 @@ const safeParseArray = <T,>(raw: string | null): T[] | null => {
 
 export const loadStoredPlans = (): StoredPlan[] | null => {
   if (typeof window === "undefined") return null;
-  return safeParseArray<StoredPlan>(window.localStorage.getItem(DATA_PLANS_KEY));
+  const raw = window.localStorage.getItem(DATA_PLANS_KEY);
+  const legacyRaw = raw ? null : window.localStorage.getItem(LEGACY_DATA_PLANS_KEY);
+  const parsed = safeParseArray<StoredPlan>(raw ?? legacyRaw);
+  if (parsed && legacyRaw) {
+    window.localStorage.setItem(DATA_PLANS_KEY, JSON.stringify(parsed));
+    window.localStorage.removeItem(LEGACY_DATA_PLANS_KEY);
+  }
+  return parsed;
 };
 
 export const saveStoredPlans = (plans: StoredPlan[]) => {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(DATA_PLANS_KEY, JSON.stringify(plans));
+  window.localStorage.removeItem(LEGACY_DATA_PLANS_KEY);
 };

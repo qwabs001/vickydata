@@ -50,6 +50,7 @@ const PAGE_SIZE = 7;
 
 const statusOptions: UserStatus[] = ["Active", "Suspended", "VIP"];
 const roleOptions: UserRole[] = ["CUSTOMER", "AGENT"];
+const LEGACY_AUTH_BACKUP_KEY = `${["kel", "data", "gh"].join("")}.auth.adminBackup`;
 
 const getInitials = (name: string) => {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -351,7 +352,7 @@ export default function Page() {
 
       if (typeof window !== "undefined") {
         window.localStorage.setItem(
-          "keldatagh.auth.adminBackup",
+          "bundlearena.auth.adminBackup",
           JSON.stringify({
             id: user.id,
             username: user.username,
@@ -359,6 +360,7 @@ export default function Page() {
             role: user.role
           })
         );
+        window.localStorage.removeItem(LEGACY_AUTH_BACKUP_KEY);
       }
 
       login(data.user);

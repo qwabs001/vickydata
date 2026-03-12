@@ -7,7 +7,7 @@ Cloudinary is used for uploading logos and network images. It's **optional** - y
 ### Option 1: Add to Vercel (Recommended)
 
 1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
-2. Select your **Keldatagh** project
+2. Select your **BundleArena** project
 3. Go to **Settings** → **Environment Variables**
 4. Add these three variables:
 

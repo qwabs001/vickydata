@@ -67,7 +67,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     }
 
     const lines = [
-      "Keldatagh Purchase Receipt",
+      "BundleArena Purchase Receipt",
       `Order ID: ${order.orderNumber}`,
       `Date: ${order.createdAt.toLocaleString("en-US")}`,
       `Customer: ${order.user.username ?? order.user.phoneNumber}`,
@@ -79,7 +79,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     ];
 
     const pdfBuffer = buildPdf(lines);
-    const filename = `keldatagh-${order.orderNumber}.pdf`;
+    const filename = `bundlearena-${order.orderNumber}.pdf`;
 
     return new NextResponse(pdfBuffer, {
       headers: {

@@ -1,4 +1,4 @@
-# Supabase Database Setup (keldatagh.com)
+# Supabase Database Setup (bundlearena.com)
 
 To fix "max clients reached" and enable login, use the **pooled** connection string.
 

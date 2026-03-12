@@ -113,7 +113,7 @@ const Theme5: React.FC = () => {
   const { plans } = useDataPlans(selectedNetwork?.id, selectedNetwork?.name);
 
   const primaryColor = accent || primary || "#f5c63d";
-  const brandName = "Keldatagh";
+  const brandName = "BundleArena";
 
   const primaryRgb = useMemo(() => {
     const fallback = { r: 245, g: 198, b: 61 };
@@ -788,7 +788,7 @@ const Theme5: React.FC = () => {
       </main>
 
       <footer className="border-t border-[#e8e2d7] bg-[#f8f6f3] py-4 text-center text-xs text-[#887f72] md:py-3">
-        copyright 2026 - Keldatagh
+        copyright 2026 - BundleArena
       </footer>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8e2d7] bg-[#f8f7f4]/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">

@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 
-const DEFAULT_SECRET_NAMESPACE = "keldatagh-reseller-api";
+const DEFAULT_SECRET_NAMESPACE = "bundlearena-reseller-api";
 
 function getBaseSecret(): string {
   return (

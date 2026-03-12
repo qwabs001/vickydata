@@ -1,11 +1,11 @@
-# Vercel Deployment Guide for Keldatagh
+# Vercel Deployment Guide for BundleArena
 
 ## Quick Start
 
 1. **Connect Repository to Vercel**
    - Go to [Vercel Dashboard](https://vercel.com/dashboard)
    - Click "Add New Project"
-   - Import your GitHub repository: `qwabs001/keldatagh`
+   - Import your GitHub repository: `qwabs001/bundlearena`
    - Select branch: `dev001` (or `main`)
 
 2. **Configure Environment Variables** (see below)
@@ -20,7 +20,7 @@
 
 1. Visit [vercel.com](https://vercel.com) and sign in
 2. Click **"Add New Project"**
-3. Import Git Repository → Select **"qwabs001/keldatagh"**
+3. Import Git Repository → Select **"qwabs001/bundlearena"**
 4. Configure Project:
    - **Framework Preset:** Next.js (auto-detected)
    - **Root Directory:** `./` (default)
@@ -38,20 +38,24 @@ Go to **Settings** → **Environment Variables** and add:
 # Database - Supabase Transaction Pooler (RECOMMENDED for Vercel)
 DATABASE_URL=postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
 
-DIRECT_DATABASE_URL=postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
+DIRECT_DATABASE_URL=postgresql://postgres:<DB_PASSWORD>@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require
 
 # NextAuth (REQUIRED - Generate a new secret)
 NEXTAUTH_SECRET=<GENERATE_NEW_SECRET_BELOW>
-NEXTAUTH_URL=https://keldatagh.com
+NEXTAUTH_URL=https://bundlearena.com
 
 # App Configuration
-NEXT_PUBLIC_APP_URL=https://keldatagh.com
-NEXT_PUBLIC_APP_NAME=Keldatagh
+APP_URL=https://bundlearena.com
+APP_NAME=BundleArena
+NEXT_PUBLIC_APP_URL=https://bundlearena.com
+NEXT_PUBLIC_SITE_URL=https://bundlearena.com
+NEXT_PUBLIC_APP_NAME=BundleArena
 NODE_ENV=production
 
 # Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://yezeyzqalpiefanrosws.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllemV5enFhbHBpZWZhbnJvc3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MDYzOTcsImV4cCI6MjA4NzA4MjM5N30.0ezTudXLlZ_6_wFoXM2dmJdzOHzKZHmmYRRHOF4aoIA
+NEXT_PUBLIC_SUPABASE_URL=https://kbzdbwaahfcxutelbmnm.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_BwxSgxfY_P4Dc0sZ8uptsg_g6a0yZzZ
 ```
 
 #### Optional Variables (Payment Providers)
@@ -87,7 +91,7 @@ Copy the output and paste it as `NEXTAUTH_SECRET` in Vercel.
 
 1. Click **"Deploy"** button
 2. Wait for build to complete (2-5 minutes)
-3. Your site will be live at: `https://keldatagh-xxx.vercel.app`
+3. Your site will be live at: `https://bundlearena-xxx.vercel.app`
 
 ### Step 5: Run Database Migrations
 
@@ -105,17 +109,17 @@ npx prisma migrate deploy
 ### Step 6: Configure Custom Domain
 
 1. Go to **Settings** → **Domains**
-2. Add your domain: `keldatagh.com`
+2. Add your domain: `bundlearena.com`
 3. Follow DNS configuration instructions
 4. Wait for DNS propagation (5-30 minutes)
 
 ## Post-Deployment Checklist
 
 - [ ] Environment variables are set correctly
-- [ ] `NEXTAUTH_URL` matches your domain (`https://keldatagh.com`)
+- [ ] `NEXTAUTH_URL` matches your domain (`https://bundlearena.com`)
 - [ ] `NEXTAUTH_SECRET` is set and secure
 - [ ] Database migrations are applied
-- [ ] Custom domain is configured (if using `keldatagh.com`)
+- [ ] Custom domain is configured (if using `bundlearena.com`)
 - [ ] Payment provider credentials are set (Admin → Payment Settings)
 - [ ] Test login/signup functionality
 - [ ] Test data bundle purchase flow

@@ -26,7 +26,13 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const STORAGE_KEY = "keldatagh.auth";
+const STORAGE_KEY = "bundlearena.auth";
+const LEGACY_STORAGE_KEYS = [`${["kel", "data", "gh"].join("")}.auth`] as const;
+
+const clearLegacyStorage = () => {
+  if (typeof window === "undefined") return;
+  LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -37,20 +43,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     if (nextUser) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
+      clearLegacyStorage();
     } else {
       window.localStorage.removeItem(STORAGE_KEY);
+      clearLegacyStorage();
     }
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(STORAGE_KEY);
+    const stored =
+      window.localStorage.getItem(STORAGE_KEY)
+      ?? LEGACY_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find((value): value is string => Boolean(value));
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as AuthUser;
         setUser(parsed);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        clearLegacyStorage();
       } catch {
         window.localStorage.removeItem(STORAGE_KEY);
+        clearLegacyStorage();
       }
     }
     setLoading(false);
@@ -59,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handleStorage = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY) return;
+      if (event.key !== STORAGE_KEY && !LEGACY_STORAGE_KEYS.includes(event.key as (typeof LEGACY_STORAGE_KEYS)[number])) return;
       if (!event.newValue) {
         setUser(null);
         return;
@@ -67,6 +80,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const parsed = JSON.parse(event.newValue) as AuthUser;
         setUser(parsed);
+        if (event.key && event.key !== STORAGE_KEY) {
+          window.localStorage.setItem(STORAGE_KEY, event.newValue);
+          clearLegacyStorage();
+        }
       } catch {
         setUser(null);
       }

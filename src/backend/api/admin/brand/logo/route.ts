@@ -17,7 +17,7 @@ async function resolveToDirectImageUrl(pageUrl: string): Promise<string | null> 
     // Only resolve known page URLs; skip already-direct CDN hosts (e.g. i.ibb.co)
     if (host !== "ibb.co" && host !== "imgbb.com") return null;
     const res = await fetch(pageUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; Keldatagh/1.0)" },
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BundleArena/1.0)" },
       signal: AbortSignal.timeout(8000)
     });
     if (!res.ok) return null;

@@ -7,15 +7,16 @@ import { ContactWidget } from "@/frontend/components/ContactWidget";
 import { getBrandTheme, hexToRgbString } from "@/backend/lib/theme";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "900"] });
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://keldatagh.com";
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://bundlearena.com").replace(/\/$/, "");
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "BundleArena";
 
 export async function generateMetadata(): Promise<Metadata> {
   const theme = await getBrandTheme();
   return {
     metadataBase: new URL(SITE_URL),
     title: {
-      default: "Keldatagh | Buy Cheap Data Bundles in Ghana",
-      template: "%s | Keldatagh"
+      default: `${APP_NAME} | Buy Cheap Data Bundles in Ghana`,
+      template: `%s | ${APP_NAME}`
     },
     description: "Buy cheap data bundles in Ghana. Instant MTN, Telecel, AirtelTigo top ups with secure payments and rewards.",
     keywords: [
@@ -26,22 +27,22 @@ export async function generateMetadata(): Promise<Metadata> {
       "AirtelTigo data",
       "data bundle",
       "buy data online",
-      "Keldatagh"
+      APP_NAME
     ],
     alternates: {
       canonical: "/"
     },
     openGraph: {
-      title: "Keldatagh | Buy Cheap Data Bundles in Ghana",
+      title: `${APP_NAME} | Buy Cheap Data Bundles in Ghana`,
       description: "Instant data bundle purchases in Ghana with fast delivery and secure payments.",
       url: SITE_URL,
-      siteName: "Keldatagh",
+      siteName: APP_NAME,
       images: theme.logoUrl ? [theme.logoUrl] : undefined,
       type: "website"
     },
     twitter: {
       card: "summary_large_image",
-      title: "Keldatagh | Buy Cheap Data Bundles in Ghana",
+      title: `${APP_NAME} | Buy Cheap Data Bundles in Ghana`,
       description: "Instant data bundle purchases in Ghana with fast delivery and secure payments.",
       images: theme.logoUrl ? [theme.logoUrl] : undefined
     },

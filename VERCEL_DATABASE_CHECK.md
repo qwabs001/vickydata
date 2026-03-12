@@ -20,7 +20,7 @@ The `MaxClientsInSessionMode` error means Vercel might be using a different `DAT
 ### Step 1: Check Vercel Environment Variables
 
 1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
-2. Select your **Keldatagh** project
+2. Select your **BundleArena** project
 3. Go to **Settings** → **Environment Variables**
 4. Find `DATABASE_URL` and verify it matches:
 

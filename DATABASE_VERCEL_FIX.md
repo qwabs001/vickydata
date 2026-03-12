@@ -24,7 +24,7 @@ So the problem isn’t that the link is “wrong” — it’s that **Session mo
 Use this **exact** value for `DATABASE_URL` in Vercel (replace with your real password if different):
 
 ```
-postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
+postgresql://postgres.kbzdbwaahfcxutelbmnm:PASSWORD@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
 ```
 
 Important:
@@ -37,13 +37,13 @@ Important:
 
 ## Steps in Vercel
 
-1. Open [Vercel Dashboard](https://vercel.com/dashboard) → your **Keldatagh** project.
+1. Open [Vercel Dashboard](https://vercel.com/dashboard) → your **BundleArena** project.
 2. Go to **Settings** → **Environment Variables**.
 3. Find **`DATABASE_URL`**.
 4. **Edit** (or add it if missing).
 5. Set the value to:
    ```
-   postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
+   postgresql://postgres.kbzdbwaahfcxutelbmnm:PASSWORD@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
    ```
 6. Enable it for **Production** (and Preview/Development if you use them).
 7. Save.

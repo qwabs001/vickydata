@@ -120,7 +120,7 @@ export default function CustomerOrdersPage() {
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `keldatagh-${order.orderNumber}.pdf`;
+      anchor.download = `bundlearena-${order.orderNumber}.pdf`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();

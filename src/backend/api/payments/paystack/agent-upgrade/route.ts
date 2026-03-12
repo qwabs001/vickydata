@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     // Paystack requires email; use a fixed valid fallback for agent upgrade flow
-    const userEmail = "customer@keldatagh.com";
+    const userEmail = "customer@bundlearena.com";
 
     // Initialize Paystack payment (callback_url = where to redirect user after payment)
     const paymentResult = await paystackService.initializePayment({

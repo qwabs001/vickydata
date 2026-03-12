@@ -135,7 +135,7 @@ export async function POST(request: Request) {
     let userEmail = user.fullName || user.username || user.phoneNumber || "customer";
     // If it doesn't look like an email, make it one
     if (!userEmail.includes("@")) {
-      userEmail = `${userEmail.replace(/[^a-zA-Z0-9]/g, "")}@keldatagh.com`;
+      userEmail = `${userEmail.replace(/[^a-zA-Z0-9]/g, "")}@bundlearena.com`;
     }
     
     console.log("[Paystack Initialize] Initializing payment:", {

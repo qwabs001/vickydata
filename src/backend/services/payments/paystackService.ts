@@ -1,5 +1,5 @@
 const PAYSTACK_URL = "https://api.paystack.co";
-const FALLBACK_PAYSTACK_EMAIL = "customer@keldatagh.com";
+const FALLBACK_PAYSTACK_EMAIL = "customer@bundlearena.com";
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -12,7 +12,7 @@ const resolvePaystackEmail = (value?: string | null) => {
     .replace(/^[._+-]+|[._+-]+$/g, "")
     .slice(0, 64);
 
-  return localPart ? `${localPart}@keldatagh.com` : FALLBACK_PAYSTACK_EMAIL;
+  return localPart ? `${localPart}@bundlearena.com` : FALLBACK_PAYSTACK_EMAIL;
 };
 
 export const paystackService = {
@@ -26,7 +26,11 @@ export const paystackService = {
   }) {
     const reference = `PAY-${params.orderNumber}-${Date.now()}`;
     const secretKey = params.secretKey || process.env.PAYSTACK_SECRET_KEY;
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ??
+      process.env.NEXT_PUBLIC_APP_URL ??
+      process.env.APP_URL ??
+      "http://localhost:3000";
 
     if (!secretKey) {
       throw new Error("Paystack secret key not configured. Please configure Paystack in Admin → Payment Settings.");

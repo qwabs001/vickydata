@@ -26,7 +26,10 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [paystackSaved, setPaystackSaved] = useState<string | null>(null);
   const [moolreSaved, setMoolreSaved] = useState<string | null>(null);
-  const appUrl = typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL ?? "https://keldatagh.com";
+  const appUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://bundlearena.com";
   const callbackUrl = `${appUrl.replace(/\/$/, "")}/api/payments/moolre/callback`;
 
   const loadSettings = useCallback(async () => {

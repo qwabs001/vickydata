@@ -1,11 +1,11 @@
-# Fix Database 500 Errors on keldatagh.com
+# Fix Database 500 Errors on bundlearena.com
 
 If you see "Circuit breaker open" or 500 errors on all API routes, fix `DATABASE_URL` in Vercel.
 
 ## Step 1: Get connection string from Supabase
 
 1. Go to https://supabase.com/dashboard
-2. Select your project (Keldatagh - yezeyzqalpiefanrosws)
+2. Select your project (BundleArena - kbzdbwaahfcxutelbmnm)
 3. **Project Settings** (gear) → **Database**
 4. Under **Connection string**, select **URI**
 5. Choose **Transaction** mode
@@ -45,11 +45,11 @@ postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-1-eu-west-1.pooler.supabas
 1. **Deployments** tab
 2. Click **...** on latest deployment → **Redeploy**
 3. Wait 2–3 minutes
-4. Try https://keldatagh.com again
+4. Try https://bundlearena.com again
 
 ## Verify
 
-Visit: https://keldatagh.com/api/health
+Visit: https://bundlearena.com/api/health
 
 - `{"ok":true,"database":"connected"}` = fixed
 - `{"ok":false,"database":"disconnected"}` = still broken, recheck password and URL

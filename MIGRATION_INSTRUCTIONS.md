@@ -2,28 +2,28 @@
 
 ## Supabase Database Connection
 
-**Session Pooler URL:** `postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres`
+**Session Pooler URL:** `postgresql://postgres.kbzdbwaahfcxutelbmnm:PASSWORD@aws-1-eu-west-1.pooler.supabase.com:5432/postgres`
 
-**Direct URL:** `postgresql://postgres:globNFK8uziL24H7@db.yezeyzqalpiefanrosws.supabase.co:5432/postgres`
+**Direct URL:** `postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres`
 
-**Project URL:** `https://yezeyzqalpiefanrosws.supabase.co`
+**Project URL:** `https://kbzdbwaahfcxutelbmnm.supabase.co`
 
 ## Running Migrations
 
 ### Option 1: Using the Migration Script
 
 ```bash
-cd /Users/qwabsimac/Documents/Keldatagh
+cd /Users/qwabsimac/Documents/BundleArena
 ./run-migrations.sh
 ```
 
 ### Option 2: Manual Command
 
 ```bash
-cd /Users/qwabsimac/Documents/Keldatagh
+cd /Users/qwabsimac/Documents/BundleArena
 
-export DATABASE_URL="postgresql://postgres:globNFK8uziL24H7@db.yezeyzqalpiefanrosws.supabase.co:5432/postgres?sslmode=require"
-export DIRECT_DATABASE_URL="postgresql://postgres:globNFK8uziL24H7@db.yezeyzqalpiefanrosws.supabase.co:5432/postgres?sslmode=require"
+export DATABASE_URL="postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require"
+export DIRECT_DATABASE_URL="postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require"
 
 npx prisma migrate deploy
 npx prisma generate
@@ -32,10 +32,10 @@ npx prisma generate
 ### Option 3: Using npm script
 
 ```bash
-cd /Users/qwabsimac/Documents/Keldatagh
+cd /Users/qwabsimac/Documents/BundleArena
 
-export DATABASE_URL="postgresql://postgres:globNFK8uziL24H7@db.yezeyzqalpiefanrosws.supabase.co:5432/postgres?sslmode=require"
-export DIRECT_DATABASE_URL="postgresql://postgres:globNFK8uziL24H7@db.yezeyzqalpiefanrosws.supabase.co:5432/postgres?sslmode=require"
+export DATABASE_URL="postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require"
+export DIRECT_DATABASE_URL="postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require"
 
 npm run prisma:migrate
 npm run prisma:generate
@@ -60,7 +60,7 @@ npm run prisma:generate
    brew install supabase/tap/supabase
    
    # Link to your project
-   supabase link --project-ref yezeyzqalpiefanrosws
+   supabase link --project-ref kbzdbwaahfcxutelbmnm
    
    # Run migrations
    supabase db push
@@ -82,8 +82,9 @@ The following migrations are ready to be applied:
 When deploying, set these environment variables:
 
 ```env
-DATABASE_URL="postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1"
-DIRECT_DATABASE_URL="postgresql://postgres.yezeyzqalpiefanrosws:globNFK8uziL24H7@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
-NEXT_PUBLIC_SUPABASE_URL="https://yezeyzqalpiefanrosws.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllemV5enFhbHBpZWZhbnJvc3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MDYzOTcsImV4cCI6MjA4NzA4MjM5N30.0ezTudXLlZ_6_wFoXM2dmJdzOHzKZHmmYRRHOF4aoIA"
+DATABASE_URL="postgresql://postgres.kbzdbwaahfcxutelbmnm:PASSWORD@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require&connection_limit=1"
+DIRECT_DATABASE_URL="postgresql://postgres.kbzdbwaahfcxutelbmnm:PASSWORD@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
+NEXT_PUBLIC_SUPABASE_URL="https://kbzdbwaahfcxutelbmnm.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sb_publishable_BwxSgxfY_P4Dc0sZ8uptsg_g6a0yZzZ"
 ```

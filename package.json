@@ -1,5 +1,5 @@
 {
-  "name": "keldatagh",
+  "name": "bundlearena",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,6 +10,7 @@
     "test:reseller": "tsx --test tests/reseller/**/*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:supabase": "./run-migrations.sh",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:cleanup": "tsx prisma/cleanup.ts",
     "prisma:normalize-ghbundle": "tsx prisma/normalize-ghbundle-config.ts",

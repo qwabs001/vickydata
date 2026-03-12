@@ -119,7 +119,7 @@ export default function AdminLayout({
                 <div className="flex size-10 items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.12)]">
                   <Image
                     src={logoUrl}
-                    alt="Keldatagh logo"
+                    alt="BundleArena logo"
                     width={36}
                     height={36}
                     priority
@@ -133,7 +133,7 @@ export default function AdminLayout({
                   </svg>
                 </div>
               )}
-              <span className="text-lg font-black text-[#0f172a]">KELDATAGH</span>
+              <span className="text-lg font-black text-[#0f172a]">BUNDLEARENA</span>
             </div>
 
             <Link
