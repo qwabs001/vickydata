@@ -113,6 +113,7 @@ const Theme5: React.FC = () => {
   const { plans } = useDataPlans(selectedNetwork?.id, selectedNetwork?.name);
 
   const primaryColor = accent || primary || "#f5c63d";
+  const sectionAccent = primary || "#4f6df5";
   const deepSurfaceColor = "#0F172B";
   const brandName = "BundleArena";
 
@@ -127,6 +128,18 @@ const Theme5: React.FC = () => {
     };
   }, [primaryColor]);
   const primaryRgba = (alpha: number) => `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, ${alpha})`;
+  const sectionAccentRgb = useMemo(() => {
+    const fallback = { r: 79, g: 109, b: 245 };
+    const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(sectionAccent || "");
+    if (!match) return fallback;
+    return {
+      r: parseInt(match[1], 16),
+      g: parseInt(match[2], 16),
+      b: parseInt(match[3], 16),
+    };
+  }, [sectionAccent]);
+  const sectionAccentRgba = (alpha: number) =>
+    `rgba(${sectionAccentRgb.r}, ${sectionAccentRgb.g}, ${sectionAccentRgb.b}, ${alpha})`;
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -651,36 +664,60 @@ const Theme5: React.FC = () => {
                     key={card.key}
                     type="button"
                     onClick={() => setSelectedNetworkKey(card.key)}
-                    className={`rounded-xl border bg-white p-2 text-center transition-all md:rounded-2xl md:p-4 ${
-                      isSelected ? "shadow-sm" : "hover:border-[#d6c9b3]"
-                    }`}
+                    className="rounded-[22px] border p-3 text-left transition-all md:p-4"
                     style={{
-                      borderColor: isSelected ? primaryColor : "#e8dfd2",
-                      backgroundColor: isSelected ? primaryRgba(0.08) : "#ffffff",
+                      borderColor: isSelected ? sectionAccent : "#e4e7ef",
+                      background: isSelected
+                        ? `linear-gradient(180deg, ${sectionAccentRgba(0.12)} 0%, rgba(255,255,255,0.98) 100%)`
+                        : "#ffffff",
+                      boxShadow: isSelected
+                        ? `0 16px 32px ${sectionAccentRgba(0.16)}`
+                        : "0 10px 24px rgba(15, 23, 43, 0.05)",
                     }}
                   >
-                    <div className="flex justify-center">
-                      <Image
-                        src={card.icon}
-                        alt={card.label}
-                        width={120}
-                        height={40}
-                        loading="lazy"
-                        className="h-8 w-auto max-w-[68px] object-contain md:h-10 md:max-w-[120px]"
-                      />
+                    <div className="flex items-start justify-between gap-3">
+                      <div
+                        className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                        style={{
+                          backgroundColor: isSelected ? sectionAccentRgba(0.12) : "#f4f7fb",
+                        }}
+                      >
+                        <Image
+                          src={card.icon}
+                          alt={card.label}
+                          width={44}
+                          height={44}
+                          loading="lazy"
+                          className="h-8 w-auto max-w-[44px] object-contain"
+                        />
+                      </div>
+                      <span
+                        className="flex h-5 w-5 items-center justify-center rounded-full border"
+                        style={{
+                          borderColor: isSelected ? sectionAccent : "#d7dce6",
+                          backgroundColor: isSelected ? sectionAccent : "transparent",
+                        }}
+                      >
+                        <span className="h-2 w-2 rounded-full bg-white" />
+                      </span>
                     </div>
-                    <h3 className="mt-2 text-center text-[10px] font-extrabold leading-tight text-[#1b170f] md:mt-3 md:text-sm">
-                      {card.label}
-                    </h3>
-                    <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#8f836f] md:mt-2 md:text-[11px]">
-                      {card.packageCount} package{card.packageCount === 1 ? "" : "s"}
+                    <div className="mt-5">
+                      <h3 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#162033] md:text-sm">
+                        {card.label}
+                      </h3>
+                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7d8797] md:text-[11px]">
+                        {card.packageCount} package{card.packageCount === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <p className="mt-4 text-[11px] leading-5 text-[#697488]">
+                      {card.packageCount > 0 ? "Packages ready to order" : "No plans assigned yet"}
                     </p>
                   </button>
                 );
               })}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-[#e8dfd2] bg-white p-4 sm:p-5">
+            <div className="mt-6 rounded-[26px] border border-[#e2e7f0] bg-white p-4 shadow-[0_18px_36px_rgba(15,23,43,0.04)] sm:p-5">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">
                 Recipient&apos;s Number
               </label>
@@ -690,10 +727,30 @@ const Theme5: React.FC = () => {
                 onChange={(event) => setRecipientNumber(event.target.value)}
                 placeholder="e.g. 054 123 4567"
                 className="w-full rounded-xl border border-[#e1d8ca] bg-[#fbfaf8] px-4 py-3 text-sm outline-none transition focus:border-[var(--theme5-primary)]"
-                style={{ ["--theme5-primary" as any]: primaryColor } as React.CSSProperties}
+                style={{ ["--theme5-primary" as any]: sectionAccent } as React.CSSProperties}
               />
 
-              <p className="mt-5 text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">Choose Data Package</p>
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">
+                    Choose Data Package
+                  </p>
+                  <p className="mt-1 text-sm text-[#697488]">
+                    Showing plans currently mapped to {selectedNetworkName}.
+                  </p>
+                </div>
+                {filteredPlans.length > 0 ? (
+                  <span
+                    className="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em]"
+                    style={{
+                      backgroundColor: sectionAccentRgba(0.1),
+                      color: sectionAccent,
+                    }}
+                  >
+                    {filteredPlans.length} live plan{filteredPlans.length === 1 ? "" : "s"}
+                  </span>
+                ) : null}
+              </div>
               {filteredPlans.length > 0 ? (
                 <>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -704,19 +761,49 @@ const Theme5: React.FC = () => {
                           key={plan.id}
                           type="button"
                           onClick={() => setSelectedPlan(plan)}
-                          className="flex items-center justify-between rounded-xl border bg-white px-4 py-3 text-left"
+                          className="rounded-[22px] border px-4 py-4 text-left transition-all"
                           style={{
-                            borderColor: selected ? primaryColor : "#e5ddcf",
-                            backgroundColor: selected ? primaryRgba(0.08) : "#ffffff",
+                            borderColor: selected ? sectionAccent : "#e4e8f0",
+                            background: selected
+                              ? `linear-gradient(180deg, ${sectionAccentRgba(0.1)} 0%, rgba(255,255,255,0.98) 100%)`
+                              : "#fbfcfe",
+                            boxShadow: selected
+                              ? `0 16px 28px ${sectionAccentRgba(0.14)}`
+                              : "inset 0 1px 0 rgba(255,255,255,0.9)",
                           }}
                         >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-bold text-[#1d180f]">{plan.name}</span>
-                            <span className="block truncate text-xs text-[#8f836f]">{plan.dataAmount || plan.name}</span>
-                          </span>
-                          <span className="ml-3 text-sm font-extrabold" style={{ color: selected ? primaryColor : "#1d180f" }}>
-                            {formatCurrency(plan.price, plan.currency || "GHS")}
-                          </span>
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="block truncate text-base font-extrabold text-[#162033]">
+                                  {plan.name}
+                                </span>
+                                <span
+                                  className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]"
+                                  style={{
+                                    backgroundColor: selected ? sectionAccent : "#e9eef9",
+                                    color: selected ? "#ffffff" : "#52627c",
+                                  }}
+                                >
+                                  {selected ? "Selected" : "Instant"}
+                                </span>
+                              </div>
+                              <span className="mt-1 block truncate text-sm text-[#7a8392]">
+                                {plan.dataAmount || plan.name}
+                              </span>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <span
+                                className="block text-base font-extrabold"
+                                style={{ color: selected ? sectionAccent : "#162033" }}
+                              >
+                                {formatCurrency(plan.price, plan.currency || "GHS")}
+                              </span>
+                              <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8d96a5]">
+                                ready now
+                              </span>
+                            </div>
+                          </div>
                         </button>
                       );
                     })}
@@ -727,7 +814,7 @@ const Theme5: React.FC = () => {
                         type="button"
                         onClick={() => setShowAllPlans(true)}
                         className="rounded-full border px-5 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-[#1d180f] transition hover:opacity-90"
-                        style={{ borderColor: primaryColor, color: primaryColor }}
+                        style={{ borderColor: sectionAccent, color: sectionAccent }}
                       >
                         Load more
                       </button>

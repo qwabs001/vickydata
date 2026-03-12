@@ -10,6 +10,7 @@ const LEGACY_BRAND_KEY = ["kel", "data", "gh"].join("");
 const LEGACY_STORAGE_KEY = `${LEGACY_BRAND_KEY}.theme.settings`;
 const LEGACY_ACCENT_KEYS = ["bundlearena.theme.accent", `${LEGACY_BRAND_KEY}.theme.accent`] as const;
 const LEGACY_LOGO_URL = `/images/networks/${LEGACY_BRAND_KEY}.png`;
+const PREVIOUS_DEFAULT_LOGO_URL = "/images/networks/bundlearena.png";
 
 export const DEFAULT_ACCENT = "#f6c500";
 export const DEFAULT_PRIMARY = "#2563eb";
@@ -28,7 +29,9 @@ const normalizeHex = (value: string, fallback: string) => {
 const normalizeLogoUrl = (value?: string) => {
   const trimmed = (value ?? "").trim();
   if (!trimmed) return undefined;
-  return trimmed === LEGACY_LOGO_URL ? "/images/networks/bundlearena.png" : trimmed;
+  return trimmed === LEGACY_LOGO_URL || trimmed === PREVIOUS_DEFAULT_LOGO_URL
+    ? "/images/brand/bundlearena-icon.png"
+    : trimmed;
 };
 
 const persistThemeSettings = (settings: ThemeSettings) => {

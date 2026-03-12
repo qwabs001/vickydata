@@ -49,8 +49,9 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
-const DEFAULT_BRAND_LOGO = "/images/networks/bundlearena.png";
+const DEFAULT_BRAND_LOGO = "/images/brand/bundlearena-icon.png";
 const LEGACY_BRAND_LOGO = `/images/networks/${["kel", "data", "gh"].join("")}.png`;
+const PREVIOUS_DEFAULT_BRAND_LOGO = "/images/networks/bundlearena.png";
 
 const normalizeHex = (value: string, fallback = DEFAULT_ACCENT) => {
   const trimmed = value.trim();
@@ -114,7 +115,9 @@ const applyBrandIcon = (logoUrl?: string) => {
 const resolveLogoUrl = (logoUrl?: string | null) => {
   const trimmed = (logoUrl ?? "").trim();
   if (!trimmed) return DEFAULT_BRAND_LOGO;
-  return trimmed === LEGACY_BRAND_LOGO ? DEFAULT_BRAND_LOGO : trimmed;
+  return trimmed === LEGACY_BRAND_LOGO || trimmed === PREVIOUS_DEFAULT_BRAND_LOGO
+    ? DEFAULT_BRAND_LOGO
+    : trimmed;
 };
 
 interface ThemeProviderProps {
