@@ -157,6 +157,7 @@ model DataPlan {
   dataAmount  String
   dataInMB    Int
   price       Float
+  agentPrice  Float?
   currency    String    @default("GHS")
   validity    String?
   description String?

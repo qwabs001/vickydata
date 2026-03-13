@@ -5,6 +5,7 @@ export interface DataPlan {
   dataAmount: string;
   dataInMB: number;
   price: number;
+  agentPrice?: number | null;
   currency: string;
   validity?: string | null;
   description?: string | null;

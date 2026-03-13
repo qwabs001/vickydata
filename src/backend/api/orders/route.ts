@@ -183,7 +183,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Data plan not found." }, { status: 404 });
     }
 
-    const effectiveAmount = await resolvePriceForUser(plan.price, userId);
+    const effectiveAmount = await resolvePriceForUser(plan.price, userId, plan.agentPrice);
 
     const order = await orderService.createOrder({
       userId,

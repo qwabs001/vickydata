@@ -12,6 +12,7 @@ const updateSchema = z.object({
   dataAmount: z.string().optional(),
   dataInMB: z.number().optional(),
   price: z.number().optional(),
+  agentPrice: z.number().nonnegative().nullable().optional(),
   currency: z.string().optional(),
   validity: z.string().optional(),
   description: z.string().optional(),

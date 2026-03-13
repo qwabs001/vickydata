@@ -6,7 +6,7 @@ import { requireAdmin } from "@/backend/lib/middleware/admin";
 import { getRequestIp, recordActivity } from "@/backend/lib/activityLog";
 import { isDatabaseConnectionError } from "@/backend/lib/utils/dbError";
 import {
-  applyAgentDiscount,
+  resolveAgentPrice,
   getAgentPricingContext
 } from "@/backend/services/agentPricingService";
 
@@ -16,6 +16,7 @@ const createSchema = z.object({
   dataAmount: z.string().optional(),
   dataInMB: z.number().optional(),
   price: z.number().nonnegative(),
+  agentPrice: z.number().nonnegative().nullable().optional(),
   currency: z.string().optional(),
   validity: z.string().optional(),
   description: z.string().optional(),
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
       const pricedPlans = pricingContext.isAgent
         ? plans.map((plan) => ({
             ...plan,
-            price: applyAgentDiscount(plan.price, pricingContext.discountPercent)
+            price: resolveAgentPrice(plan.price, plan.agentPrice, pricingContext.discountPercent)
           }))
         : plans;
       const cacheHeader = pricingContext.isAgent
@@ -122,6 +123,7 @@ export async function POST(request: Request) {
       dataAmount,
       dataInMB,
       price: payload.price,
+      agentPrice: payload.agentPrice ?? null,
       currency: payload.currency,
       validity: payload.validity,
       description: payload.description,

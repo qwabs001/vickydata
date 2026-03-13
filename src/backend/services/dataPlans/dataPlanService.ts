@@ -19,6 +19,7 @@ export const dataPlanService = {
     dataAmount: string;
     dataInMB: number;
     price: number;
+    agentPrice?: number | null;
     currency?: string;
     validity?: string;
     description?: string;
@@ -33,6 +34,7 @@ export const dataPlanService = {
         dataAmount: data.dataAmount,
         dataInMB: data.dataInMB,
         price: data.price,
+        agentPrice: data.agentPrice ?? null,
         currency: data.currency ?? "GHS",
         validity: data.validity,
         description: data.description,
@@ -50,6 +52,7 @@ export const dataPlanService = {
       dataAmount: string;
       dataInMB: number;
       price: number;
+      agentPrice: number | null;
       currency: string;
       validity: string;
       description: string;

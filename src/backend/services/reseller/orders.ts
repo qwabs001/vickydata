@@ -1,7 +1,7 @@
 import { Prisma, type AgentExternalOrder, type DataPlan, type Network, type Order, type User } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { prisma } from "@/backend/lib/db/prisma";
-import { applyAgentDiscount, getAgentPricingContext, resolvePriceForUser } from "@/backend/services/agentPricingService";
+import { getAgentPricingContext, resolveAgentPrice, resolvePriceForUser } from "@/backend/services/agentPricingService";
 import {
   MAX_RESELLER_QTY,
   buildIdempotencyKey,
@@ -103,7 +103,7 @@ export async function listResellerServices(agentId: string, options: {
   const pricingContext = await getAgentPricingContext(agentId);
   const data = plans.map((plan) => {
     const price = pricingContext.isAgent
-      ? applyAgentDiscount(plan.price, pricingContext.discountPercent)
+      ? resolveAgentPrice(plan.price, plan.agentPrice, pricingContext.discountPercent)
       : roundMoney(plan.price);
     return serializeService({ ...plan, price });
   });
@@ -210,7 +210,7 @@ export async function createResellerOrder(input: CreateOrderInput): Promise<{
     throw error;
   }
 
-  const unitPrice = await resolvePriceForUser(plan.price, input.agent.id);
+  const unitPrice = await resolvePriceForUser(plan.price, input.agent.id, plan.agentPrice);
   const totalAmount = calculateResellerOrderTotal(unitPrice, input.qty);
 
   let result: AgentExternalOrder & {

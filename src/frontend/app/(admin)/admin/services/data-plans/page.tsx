@@ -16,6 +16,7 @@ interface PlanRow {
   networkName: string;
   name: string;
   price: number;
+  agentPrice: number | null;
   validity: string;
   featured: boolean;
   currency: string;
@@ -33,6 +34,7 @@ export default function Page() {
     name: "",
     networkId: "",
     price: "",
+    agentPrice: "",
     validity: "",
     featured: false
   });
@@ -40,6 +42,7 @@ export default function Page() {
     name: "",
     networkId: "",
     price: "",
+    agentPrice: "",
     validity: "",
     featured: false
   });
@@ -88,6 +91,7 @@ export default function Page() {
           networkName: plan.network?.displayName ?? plan.network?.name ?? "Network",
           name: plan.dataAmount ?? plan.name,
           price: plan.price,
+          agentPrice: typeof plan.agentPrice === "number" ? plan.agentPrice : null,
           validity: plan.validity ?? "",
           featured: plan.isFeatured ?? false,
           currency: plan.currency ?? "GHS"
@@ -121,6 +125,7 @@ export default function Page() {
       name: plan.name,
       networkId: plan.networkId,
       price: plan.price.toFixed(2),
+      agentPrice: plan.agentPrice != null ? plan.agentPrice.toFixed(2) : "",
       validity: plan.validity,
       featured: plan.featured
     });
@@ -134,11 +139,14 @@ export default function Page() {
   const handleSave = async () => {
     if (!editingId) return;
     const parsedPrice = Number(editForm.price);
+    const parsedAgentPrice = editForm.agentPrice.trim() === "" ? null : Number(editForm.agentPrice);
     const payload = {
       name: editForm.name.trim(),
       dataAmount: editForm.name.trim(),
       networkId: editForm.networkId,
       price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
+      agentPrice:
+        parsedAgentPrice == null ? null : Number.isFinite(parsedAgentPrice) ? parsedAgentPrice : null,
       validity: editForm.validity.trim(),
       isFeatured: editForm.featured
     };
@@ -165,6 +173,7 @@ export default function Page() {
       name: "",
       networkId: networks[0]?.id ?? "",
       price: "",
+      agentPrice: "",
       validity: "",
       featured: false
     });
@@ -177,11 +186,14 @@ export default function Page() {
 
   const handleAdd = async () => {
     const parsedPrice = Number(addForm.price);
+    const parsedAgentPrice = addForm.agentPrice.trim() === "" ? null : Number(addForm.agentPrice);
     const payload = {
       name: addForm.name.trim() || "New Plan",
       dataAmount: addForm.name.trim() || "New Plan",
       networkId: addForm.networkId,
       price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
+      agentPrice:
+        parsedAgentPrice == null ? null : Number.isFinite(parsedAgentPrice) ? parsedAgentPrice : null,
       validity: addForm.validity.trim() || "30 days",
       isFeatured: addForm.featured
     };
@@ -282,6 +294,9 @@ export default function Page() {
               <p className="mt-1 text-sm font-semibold text-[#2563eb]">
                 {formatCurrency(plan.price, plan.currency)}
               </p>
+              <p className="mt-1 text-xs font-semibold text-emerald-600">
+                Agent {formatCurrency(plan.agentPrice ?? plan.price, plan.currency)}
+              </p>
               <p className="mt-1 text-xs text-slate-400">{plan.networkName}</p>
               <div className="mt-5 flex items-center gap-2">
                 <button
@@ -344,9 +359,9 @@ export default function Page() {
                   onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))}
                 />
               </label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="text-xs font-semibold text-slate-500">
-                  Price (GHS)
+                  Customer Price (GHS)
                   <input
                     className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
                     type="number"
@@ -354,6 +369,18 @@ export default function Page() {
                     min="0"
                     value={editForm.price}
                     onChange={(event) => setEditForm((prev) => ({ ...prev, price: event.target.value }))}
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-500">
+                  Agent Price (GHS)
+                  <input
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Optional manual agent price"
+                    value={editForm.agentPrice}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, agentPrice: event.target.value }))}
                   />
                 </label>
                 <label className="text-xs font-semibold text-slate-500">
@@ -433,9 +460,9 @@ export default function Page() {
                   onChange={(event) => setAddForm((prev) => ({ ...prev, name: event.target.value }))}
                 />
               </label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="text-xs font-semibold text-slate-500">
-                  Price (GHS)
+                  Customer Price (GHS)
                   <input
                     className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
                     type="number"
@@ -443,6 +470,18 @@ export default function Page() {
                     min="0"
                     value={addForm.price}
                     onChange={(event) => setAddForm((prev) => ({ ...prev, price: event.target.value }))}
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-500">
+                  Agent Price (GHS)
+                  <input
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Optional manual agent price"
+                    value={addForm.agentPrice}
+                    onChange={(event) => setAddForm((prev) => ({ ...prev, agentPrice: event.target.value }))}
                   />
                 </label>
                 <label className="text-xs font-semibold text-slate-500">

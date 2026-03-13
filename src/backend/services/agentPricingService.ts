@@ -20,6 +20,13 @@ function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function normalizeAgentPrice(value: unknown): number | null {
+  if (value == null) return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) return null;
+  return roundMoney(numeric);
+}
+
 function normalizeDiscountPercent(value: unknown): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
@@ -32,6 +39,16 @@ export function applyAgentDiscount(basePrice: number, discountPercent: number): 
   const safeBase = Number.isFinite(basePrice) ? Math.max(0, basePrice) : 0;
   const safeDiscount = normalizeDiscountPercent(discountPercent);
   return roundMoney(safeBase * (1 - safeDiscount / 100));
+}
+
+export function resolveAgentPrice(
+  basePrice: number,
+  agentPrice: number | null | undefined,
+  discountPercent: number
+): number {
+  const manualAgentPrice = normalizeAgentPrice(agentPrice);
+  if (manualAgentPrice != null) return manualAgentPrice;
+  return applyAgentDiscount(basePrice, discountPercent);
 }
 
 export async function getAgentPricingSettings(): Promise<AgentPricingSettings> {
@@ -88,8 +105,12 @@ export async function getAgentPricingContext(userId?: string | null): Promise<Ag
   };
 }
 
-export async function resolvePriceForUser(basePrice: number, userId?: string | null): Promise<number> {
+export async function resolvePriceForUser(
+  basePrice: number,
+  userId?: string | null,
+  agentPrice?: number | null
+): Promise<number> {
   const context = await getAgentPricingContext(userId);
   if (!context.isAgent) return roundMoney(basePrice);
-  return applyAgentDiscount(basePrice, context.discountPercent);
+  return resolveAgentPrice(basePrice, agentPrice, context.discountPercent);
 }

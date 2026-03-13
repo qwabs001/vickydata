@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     if (type === "order" && parsed.data.dataPlanId) {
       const selectedPlan = await prisma.dataPlan.findUnique({
         where: { id: parsed.data.dataPlanId },
-        select: { price: true, currency: true, networkId: true }
+        select: { price: true, agentPrice: true, currency: true, networkId: true }
       });
 
       if (!selectedPlan) {
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Data plan does not match selected network." }, { status: 400 });
       }
 
-      chargeAmount = await resolvePriceForUser(selectedPlan.price, userId);
+      chargeAmount = await resolvePriceForUser(selectedPlan.price, userId, selectedPlan.agentPrice);
       chargeCurrency = selectedPlan.currency ?? chargeCurrency;
     }
 
