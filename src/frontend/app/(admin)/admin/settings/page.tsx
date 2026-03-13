@@ -16,7 +16,7 @@ const cards = [
   },
   {
     title: "Payments",
-    description: "Configure Paystack, Moolre, and webhook settings.",
+    description: "Configure Moolre as the primary gateway and keep Paystack only for legacy fallback.",
     href: "/admin/settings/payments"
   },
   {

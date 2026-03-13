@@ -100,17 +100,22 @@ export default function CustomerDashboardPage() {
     });
   };
 
-  // When returning from Paystack: verify payment and credit wallet, then refresh
+  // When returning from checkout: verify payment and credit wallet, then refresh
   useEffect(() => {
     if (!user?.id || typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
     const urlPayment = params.get("payment");
-    const reference = params.get("reference") || params.get("trxref");
+    const reference =
+      params.get("ref") ||
+      params.get("reference") ||
+      params.get("transaction_ref") ||
+      params.get("txn_ref") ||
+      params.get("trxref");
 
     if (urlPayment === "success" && reference) {
       fetch(
-        `/api/payments/paystack/verify-return?reference=${encodeURIComponent(reference)}&userId=${encodeURIComponent(user.id)}`
+        `/api/payments/verify?ref=${encodeURIComponent(reference)}&userId=${encodeURIComponent(user.id)}`
       )
         .then((res) => res.json().catch(() => null))
         .then(() => {
@@ -129,9 +134,6 @@ export default function CustomerDashboardPage() {
       refreshWallet();
     }
   }, [user?.id, refreshOrders, refreshWallet]);
-
-  // Note: Paystack webhook handles payment verification automatically
-  // Removed Moolre reconcile - we're using Paystack now
 
   // Hide mobile nav when Add Funds or Quick Buy bottom sheet is open
   useEffect(() => {
@@ -207,7 +209,7 @@ export default function CustomerDashboardPage() {
     setWalletNotice(null);
     try {
       const ref = `WALLET-${user.id}-${Date.now()}`;
-      const res = await fetch("/api/payments/paystack/initialize", {
+      const res = await fetch("/api/payments/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -266,7 +268,7 @@ export default function CustomerDashboardPage() {
       const amount = Number(quickBuyPlan.price ?? 0);
       const currency = quickBuyPlan.currency ?? "GHS";
       const ref = `ORDER-${user.id}-${Date.now()}`;
-      const initRes = await fetch("/api/payments/paystack/initialize", {
+      const initRes = await fetch("/api/payments/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -309,14 +311,15 @@ export default function CustomerDashboardPage() {
     setAgentUpgradeError(null);
     try {
       const ref = `AGENT-UPGRADE-${user.id}-${Date.now()}`;
-      const response = await fetch("/api/payments/paystack/agent-upgrade", {
+      const response = await fetch("/api/payments/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
           amount: 100,
           currency: "GHS",
-          ref
+          ref,
+          type: "agent_upgrade"
         })
       });
       const data = await response.json().catch(() => null);
@@ -787,7 +790,7 @@ export default function CustomerDashboardPage() {
               </div>
               <p className="mt-5 text-sm font-semibold text-slate-900">Processing payment...</p>
               <p className="mt-2 text-xs text-slate-500 text-center">
-                Opening the Paystack checkout page. Please wait.
+                Opening the Moolre checkout page. Please wait.
               </p>
             </div>
           ) : (
@@ -849,7 +852,7 @@ export default function CustomerDashboardPage() {
                   <path d="M12 8h.01" />
                 </svg>
                 <p className="text-xs text-blue-700">
-                  You will be redirected to Paystack to complete the payment.
+                  You will be redirected to Moolre to complete the payment.
                 </p>
               </div>
 
@@ -920,7 +923,7 @@ export default function CustomerDashboardPage() {
             onClick={handleAgentUpgradeProceed}
             disabled={agentUpgradeSubmitting}
           >
-            {agentUpgradeSubmitting ? "Opening Paystack..." : "Proceed"}
+            {agentUpgradeSubmitting ? "Opening Moolre..." : "Proceed"}
           </button>
         </div>
       </Dialog>

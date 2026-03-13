@@ -482,7 +482,7 @@ const Theme5: React.FC = () => {
       }
 
       const ref = `ORDER-${user.id}-${Date.now()}`;
-      const response = await fetch("/api/payments/paystack/initialize", {
+      const response = await fetch("/api/payments/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

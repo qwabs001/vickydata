@@ -61,15 +61,16 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_BwxSgxfY_P4Dc0sZ8uptsg_g6a0y
 #### Optional Variables (Payment Providers)
 
 ```env
-# Paystack (optional - can be set in Admin → Payment Settings)
+# Moolre (primary - can be set in Admin → Payment Settings)
+MOOLRE_API_USER=
+MOOLRE_PUB_KEY=
+MOOLRE_SECRET_KEY=
+MOOLRE_ACCOUNT_NUMBER=
+
+# Paystack (legacy optional - can be set in Admin → Payment Settings)
 NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_live_xxxxx
 PAYSTACK_SECRET_KEY=sk_live_xxxxx
 PAYSTACK_WEBHOOK_SECRET=whsec_xxxxx
-
-# Moolre (optional - can be set in Admin → Payment Settings)
-MOOLRE_API_USER=
-MOOLRE_PUB_KEY=
-MOOLRE_ACCOUNT_NUMBER=
 
 # Cloudinary (optional - for logo/file uploads, or use logo URL instead)
 CLOUDINARY_CLOUD_NAME=

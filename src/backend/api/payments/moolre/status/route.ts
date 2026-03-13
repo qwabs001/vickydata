@@ -9,21 +9,24 @@ type PendingPayment = {
   userId: string;
   amount: number;
   currency: string;
-  type: "order" | "wallet";
+  type: "order" | "wallet" | "agent_upgrade";
   ref: string;
   networkId: string | null;
   dataPlanId: string | null;
   recipientNumber: string | null;
   rewardToUse: number;
   useWallet: boolean;
+  orderId?: string | null;
 };
 
 type IntentMetadata = {
+  intentKind?: string | null;
   networkId?: string | null;
   dataPlanId?: string | null;
   recipientNumber?: string | null;
   rewardToUse?: number;
   useWallet?: boolean;
+  orderId?: string | null;
 };
 
 function pendingFromIntent(intent: {
@@ -35,17 +38,24 @@ function pendingFromIntent(intent: {
   metadata: unknown;
 }): PendingPayment {
   const meta = (intent.metadata ?? {}) as IntentMetadata;
+  const intentKind = (meta.intentKind ?? "").toString().toUpperCase();
   return {
     userId: intent.userId,
     amount: intent.amount,
     currency: intent.currency,
-    type: intent.type === "ORDER" ? "order" : "wallet",
+    type:
+      intent.type === "ORDER"
+        ? "order"
+        : intentKind === "AGENT_UPGRADE"
+          ? "agent_upgrade"
+          : "wallet",
     ref: intent.reference,
     networkId: meta.networkId ?? null,
     dataPlanId: meta.dataPlanId ?? null,
     recipientNumber: meta.recipientNumber ?? null,
     rewardToUse: meta.rewardToUse ?? 0,
-    useWallet: meta.useWallet ?? false
+    useWallet: meta.useWallet ?? false,
+    orderId: meta.orderId ?? null
   };
 }
 
@@ -73,7 +83,14 @@ export async function GET(request: Request) {
     const existingOrder = await prisma.order.findFirst({
       where: { paymentReference: ref }
     });
-    if (existingOrder) {
+    if (
+      existingOrder &&
+      (
+        existingOrder.paymentStatus === "COMPLETED" ||
+        existingOrder.status === "PROCESSING" ||
+        existingOrder.status === "COMPLETED"
+      )
+    ) {
       return NextResponse.json({
         status: "completed",
         type: "order",
@@ -90,10 +107,15 @@ export async function GET(request: Request) {
       }
     });
 
-    let pendingRecord: { key: string; value: unknown } | null = null;
+    const pendingKeys = new Set<string>();
     let pending: PendingPayment | null = null;
 
     if (paymentIntent) {
+      pendingKeys.add(`pending_payment.${paymentIntent.reference}`);
+      if (paymentIntent.clientReference) {
+        pendingKeys.add(`pending_payment.${paymentIntent.clientReference}`);
+      }
+      pendingKeys.add(`pending_payment.${ref}`);
       pending = pendingFromIntent({
         userId: paymentIntent.userId,
         amount: paymentIntent.amount,
@@ -121,7 +143,7 @@ export async function GET(request: Request) {
       }
 
       if (legacyRecord) {
-        pendingRecord = { key: legacyRecord.key, value: legacyRecord.value };
+        pendingKeys.add(legacyRecord.key);
         pending = legacyRecord.value as unknown as PendingPayment;
       }
     }
@@ -191,10 +213,6 @@ export async function GET(request: Request) {
 
     // 4. Process payment (same logic as callback)
     if (pending.type === "order") {
-      if (!pending.networkId || !pending.dataPlanId || !pending.recipientNumber) {
-        return NextResponse.json({ error: "Invalid pending order data." }, { status: 400 });
-      }
-
       if (paymentIntent) {
         const locked = await prisma.paymentIntent.updateMany({
           where: { id: paymentIntent.id, status: { not: "CONFIRMED" } },
@@ -208,16 +226,26 @@ export async function GET(request: Request) {
         }
       }
 
-      const order = await orderService.createOrder({
-        userId: pending.userId,
-        networkId: pending.networkId,
-        dataPlanId: pending.dataPlanId,
-        recipientNumber: pending.recipientNumber,
-        amount: pending.amount,
-        currency: pending.currency,
-        rewardToUse: pending.rewardToUse,
-        useWallet: false
-      });
+      let order = pending.orderId
+        ? await prisma.order.findUnique({ where: { id: pending.orderId } })
+        : null;
+
+      if (!order) {
+        if (!pending.networkId || !pending.dataPlanId || !pending.recipientNumber) {
+          return NextResponse.json({ error: "Invalid pending order data." }, { status: 400 });
+        }
+
+        order = await orderService.createOrder({
+          userId: pending.userId,
+          networkId: pending.networkId,
+          dataPlanId: pending.dataPlanId,
+          recipientNumber: pending.recipientNumber,
+          amount: pending.amount,
+          currency: pending.currency,
+          rewardToUse: pending.rewardToUse,
+          useWallet: false
+        });
+      }
 
       await prisma.order.update({
         where: { id: order.id },
@@ -251,17 +279,52 @@ export async function GET(request: Request) {
       }
 
       // Clean up pending payment
-      if (pendingRecord) {
-        await prisma.settings.delete({
-          where: { key: pendingRecord.key }
-        }).catch(() => {});
-      }
+      await Promise.all(
+        Array.from(pendingKeys).map((key) =>
+          prisma.settings.delete({ where: { key } }).catch(() => {})
+        )
+      );
 
       return NextResponse.json({
         status: "completed",
         type: "order",
         orderId: order.id,
         orderNumber: order.orderNumber
+      });
+    }
+
+    if (pending.type === "agent_upgrade") {
+      await prisma.$transaction(async (tx) => {
+        if (paymentIntent) {
+          const updated = await tx.paymentIntent.updateMany({
+            where: { id: paymentIntent.id, status: { not: "CONFIRMED" } },
+            data: {
+              status: "CONFIRMED",
+              verifiedAt: new Date(),
+              rawVerify: verificationJson,
+              lastError: null
+            }
+          });
+          if (updated.count === 0) {
+            return;
+          }
+        }
+
+        await tx.user.update({
+          where: { id: pending.userId },
+          data: { role: "AGENT" }
+        });
+      });
+
+      await Promise.all(
+        Array.from(pendingKeys).map((key) =>
+          prisma.settings.delete({ where: { key } }).catch(() => {})
+        )
+      );
+
+      return NextResponse.json({
+        status: "completed",
+        type: "agent_upgrade"
       });
     }
 
@@ -314,11 +377,11 @@ export async function GET(request: Request) {
       });
     });
 
-    if (pendingRecord) {
-      await prisma.settings.delete({
-        where: { key: pendingRecord.key }
-      }).catch(() => {});
-    }
+    await Promise.all(
+      Array.from(pendingKeys).map((key) =>
+        prisma.settings.delete({ where: { key } }).catch(() => {})
+      )
+    );
 
     return NextResponse.json({
       status: "completed",

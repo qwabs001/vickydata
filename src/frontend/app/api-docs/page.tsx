@@ -284,32 +284,37 @@ limit=10          (optional) Limit results`,
         method: "POST",
         path: "/api/payments/initialize",
         title: "Initialize Payment",
-        description: "Start a Paystack payment for an order.",
+        description: "Start a Moolre hosted checkout for an order, wallet top-up, or agent upgrade.",
         auth: true,
         requestBody: `{
-  "orderId": "clx...",
-  "callbackUrl": "https://yoursite.com/callback"
+  "userId": "clx...",
+  "amount": 10,
+  "currency": "GHS",
+  "ref": "ORDER-clx-1741852000",
+  "type": "order",
+  "networkId": "clx_network",
+  "dataPlanId": "clx_plan",
+  "recipientNumber": "0241234567"
 }`,
         responseBody: `{
-  "paymentUrl": "https://checkout.paystack.com/xxx",
-  "reference": "PAY-xxx"
+  "paymentUrl": "https://pos.moolre.com/checkout/xxx",
+  "reference": "MOOLRE-xxx"
 }`
       },
       {
         method: "POST",
         path: "/api/payments/verify",
         title: "Verify Payment",
-        description: "Verify a completed Paystack payment.",
+        description: "Confirm a completed Moolre payment and process the linked order or wallet top-up.",
         auth: true,
         requestBody: `{
-  "reference": "PAY-xxx"
+  "reference": "MOOLRE-xxx"
 }`,
         responseBody: `{
-  "success": true,
-  "order": {
-    "id": "clx...",
-    "status": "COMPLETED"
-  }
+  "status": "completed",
+  "type": "order",
+  "orderId": "clx...",
+  "orderNumber": "ORD-20260313-XXXXX"
 }`
       }
     ]

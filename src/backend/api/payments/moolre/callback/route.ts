@@ -27,6 +27,7 @@ type PendingPayment = {
   recipientNumber: string | null;
   rewardToUse: number;
   useWallet: boolean;
+  orderId?: string | null;
 };
 
 type IntentMetadata = {
@@ -36,6 +37,7 @@ type IntentMetadata = {
   recipientNumber?: string | null;
   rewardToUse?: number;
   useWallet?: boolean;
+  orderId?: string | null;
 };
 
 function sleep(ms: number) {
@@ -275,7 +277,8 @@ function pendingFromIntent(intent: {
     dataPlanId: meta.dataPlanId ?? null,
     recipientNumber: meta.recipientNumber ?? null,
     rewardToUse: meta.rewardToUse ?? 0,
-    useWallet: meta.useWallet ?? false
+    useWallet: meta.useWallet ?? false,
+    orderId: meta.orderId ?? null
   };
 }
 
@@ -318,10 +321,15 @@ async function handleCallback(request: NextRequest) {
       }
     });
 
-    let pendingRecord: { key: string; value: unknown } | null = null;
+    const pendingKeys = new Set<string>();
     let pending: PendingPayment | null = null;
 
     if (paymentIntent) {
+      pendingKeys.add(`pending_payment.${paymentIntent.reference}`);
+      if (paymentIntent.clientReference) {
+        pendingKeys.add(`pending_payment.${paymentIntent.clientReference}`);
+      }
+      pendingKeys.add(`pending_payment.${reference}`);
       pending = pendingFromIntent({
         userId: paymentIntent.userId,
         amount: paymentIntent.amount,
@@ -351,7 +359,7 @@ async function handleCallback(request: NextRequest) {
       }
 
       if (legacyRecord) {
-        pendingRecord = { key: legacyRecord.key, value: legacyRecord.value };
+        pendingKeys.add(legacyRecord.key);
         pending = legacyRecord.value as unknown as PendingPayment;
       }
     }
@@ -510,16 +518,6 @@ async function handleCallback(request: NextRequest) {
 
     // 3. Process based on type (only reached when verification succeeded)
     if (pending.type === "order") {
-      if (!pending.networkId || !pending.dataPlanId || !pending.recipientNumber) {
-        console.error("[Moolre callback] Missing order fields for:", reference);
-        return respond(
-          request,
-          errorUrl,
-          { ok: false, received: true, error: "invalid_pending_order", reference },
-          400
-        );
-      }
-
       let orderId: string | null = null;
       let shouldCreateOrder = true;
       if (paymentIntent) {
@@ -534,16 +532,32 @@ async function handleCallback(request: NextRequest) {
       }
 
       if (!paymentIntent || shouldCreateOrder) {
-        const order = await orderService.createOrder({
-          userId: pending.userId,
-          networkId: pending.networkId,
-          dataPlanId: pending.dataPlanId,
-          recipientNumber: pending.recipientNumber,
-          amount: pending.amount,
-          currency: pending.currency,
-          rewardToUse: pending.rewardToUse,
-          useWallet: false
-        });
+        let order = pending.orderId
+          ? await prisma.order.findUnique({ where: { id: pending.orderId } })
+          : null;
+
+        if (!order) {
+          if (!pending.networkId || !pending.dataPlanId || !pending.recipientNumber) {
+            console.error("[Moolre callback] Missing order fields for:", reference);
+            return respond(
+              request,
+              errorUrl,
+              { ok: false, received: true, error: "invalid_pending_order", reference },
+              400
+            );
+          }
+
+          order = await orderService.createOrder({
+            userId: pending.userId,
+            networkId: pending.networkId,
+            dataPlanId: pending.dataPlanId,
+            recipientNumber: pending.recipientNumber,
+            amount: pending.amount,
+            currency: pending.currency,
+            rewardToUse: pending.rewardToUse,
+            useWallet: false
+          });
+        }
         orderId = order.id;
 
         // Mark payment as confirmed — do NOT set status to COMPLETED yet.
@@ -683,11 +697,11 @@ async function handleCallback(request: NextRequest) {
     }
 
     // 4. Clean up pending payment (use record key — ref in URL may differ from stored key)
-    if (pendingRecord) {
-      await prisma.settings.delete({
-        where: { key: pendingRecord.key }
-      }).catch(() => {});
-    }
+    await Promise.all(
+      Array.from(pendingKeys).map((key) =>
+        prisma.settings.delete({ where: { key } }).catch(() => {})
+      )
+    );
 
     return respond(
       request,

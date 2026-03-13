@@ -148,7 +148,7 @@ export default function Page() {
     <div className="flex max-w-4xl flex-col gap-6">
       <header>
         <h1 className="text-2xl font-black text-[#0f172a]">Payment Settings</h1>
-        <p className="text-sm text-slate-500">Manage Paystack and Moolre credentials.</p>
+        <p className="text-sm text-slate-500">Use Moolre as your primary checkout gateway and keep Paystack only as a legacy fallback.</p>
       </header>
 
       {saveNotice ? (
@@ -161,10 +161,10 @@ export default function Page() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-[#0f172a]">Paystack</h2>
-            <p className="text-sm text-slate-500">Manage Paystack keys and webhook secrets.</p>
+            <p className="text-sm text-slate-500">Keep Paystack keys only if you still need legacy webhook or fallback support.</p>
           </div>
-          <span className="rounded-full bg-[#e7efff] px-3 py-1 text-xs font-semibold text-[#2563eb]">
-            Active
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            Legacy
           </span>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -220,10 +220,10 @@ export default function Page() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-[#0f172a]">Moolre</h2>
-            <p className="text-sm text-slate-500">Configure Mobile Money payments.</p>
+            <p className="text-sm text-slate-500">Configure Mobile Money payments and hosted checkout.</p>
           </div>
           <span className="rounded-full bg-[#ecfdf3] px-3 py-1 text-xs font-semibold text-[#16a34a]">
-            Available
+            Primary
           </span>
         </div>
 

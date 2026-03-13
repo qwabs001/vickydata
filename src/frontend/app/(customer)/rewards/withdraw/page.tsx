@@ -55,9 +55,6 @@ export default function WalletPage() {
     loadTransactions();
   }, [loadTransactions]);
 
-  // Note: Paystack webhook handles payment verification automatically
-  // Removed Moolre reconcile - we're using Paystack now
-
   useEffect(() => {
     if (typeof document === "undefined") return;
     if (showWalletModal) {
@@ -401,7 +398,7 @@ export default function WalletPage() {
             />
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            You will be redirected to Paystack to complete the payment.
+            You will be redirected to Moolre to complete the payment.
           </p>
           <button
             type="button"
@@ -416,7 +413,7 @@ export default function WalletPage() {
               setWalletAddSubmitting(true);
               try {
                 const ref = `WALLET-${user.id}-${Date.now()}`;
-                const res = await fetch("/api/payments/paystack/initialize", {
+                const res = await fetch("/api/payments/initialize", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -446,7 +443,7 @@ export default function WalletPage() {
             }}
             disabled={walletAddSubmitting}
           >
-            {walletAddSubmitting ? "Opening Paystack..." : "Add Funds"}
+            {walletAddSubmitting ? "Opening Moolre..." : "Add Funds"}
           </button>
         </div>
       </Dialog>

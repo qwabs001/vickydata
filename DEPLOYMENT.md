@@ -31,12 +31,13 @@ NEXT_PUBLIC_APP_NAME="BundleArena"
 NODE_ENV="production"
 
 # Payments (optional – can be set in Admin → Payment Settings instead)
+MOOLRE_API_USER=""
+MOOLRE_PUB_KEY=""
+MOOLRE_SECRET_KEY=""
+MOOLRE_ACCOUNT_NUMBER=""
 NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY="pk_live_xxxxx"
 PAYSTACK_SECRET_KEY="sk_live_xxxxx"
 PAYSTACK_WEBHOOK_SECRET="whsec_xxxxx"
-MOOLRE_API_USER=""
-MOOLRE_PUB_KEY=""
-MOOLRE_ACCOUNT_NUMBER=""
 ```
 
 ## Supabase connection (required)
@@ -74,7 +75,7 @@ npm start
 - [ ] `NEXTAUTH_SECRET` is set and kept secret
 - [ ] `DATABASE_URL` is valid and reachable
 - [ ] Moolre: credentials in Admin → Payment Settings; callback URL in Moolre dashboard: `https://bundlearena.com/api/payments/moolre/callback`
-- [ ] Paystack webhook URL (if used): `https://bundlearena.com/api/webhooks/paystack`
+- [ ] Paystack webhook URL (legacy optional): `https://bundlearena.com/api/webhooks/paystack`
 
 ## Reseller API proxy (when agent IPs are blocked)
 

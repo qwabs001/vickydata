@@ -63,7 +63,8 @@ Or you can use port 5432 for this one if you prefer; migrations usually run from
 
 | Variable | When to add |
 |----------|-------------|
-| **PAYSTACK_SECRET_KEY**, **NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY** | If you use Paystack (or set in Admin → Payment Settings). |
+| **MOOLRE_API_USER**, **MOOLRE_PUB_KEY**, **MOOLRE_SECRET_KEY**, **MOOLRE_ACCOUNT_NUMBER** | Recommended if you want Moolre configured from env instead of Admin → Payment Settings. |
+| **PAYSTACK_SECRET_KEY**, **NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY** | Only if you still want Paystack as a legacy fallback. |
 | **CLOUDINARY_CLOUD_NAME**, **CLOUDINARY_API_KEY**, **CLOUDINARY_API_SECRET** | If you use logo/file uploads via Cloudinary. |
 
 ---
