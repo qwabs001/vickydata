@@ -1932,12 +1932,8 @@ async function markOrderFailed(
     return;
   }
 
-  try {
-    const { orderService } = await import("@/backend/services/orders/orderService");
-    await orderService.refundFailedOrder(orderId);
-  } catch (refundErr) {
-    console.error("[provider] Refund error:", refundErr);
-  }
+  // Keep paid funds locked after provider failure until an admin explicitly
+  // uses "Cancel with refund" from the order dashboard.
 
   try {
     const { enqueueWebhookIfStatusChanged } = await import("@/backend/services/reseller/statusHooks");

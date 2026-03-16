@@ -342,7 +342,7 @@ export const orderService = {
     });
   },
 
-  /** Refund rewardUsed and/or wallet when order fails — user should not lose funds if provider fails. */
+  /** Manual refund helper for admin-driven refund flows. */
   async refundFailedOrder(orderId: string): Promise<void> {
     const order = await prisma.order.findUnique({
       where: { id: orderId }
