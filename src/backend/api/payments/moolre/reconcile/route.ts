@@ -159,6 +159,12 @@ async function processIntent(intent: {
     }).catch(() => {});
 
     try {
+      await orderService.recordDirectPurchaseWalletTransaction(order.id);
+    } catch (walletErr) {
+      console.error("[Moolre reconcile] Wallet ledger error:", walletErr);
+    }
+
+    try {
       const { dataProviderService } = await import(
         "@/backend/services/dataProvider/dataProviderService"
       );
@@ -264,6 +270,11 @@ async function processPending(pending: PendingPayment, recordKey: string) {
       where: { paymentReference: pending.ref ?? verifiedRef }
     });
     if (existingOrder) {
+      try {
+        await orderService.recordDirectPurchaseWalletTransaction(existingOrder.id);
+      } catch (walletErr) {
+        console.error("[Moolre reconcile] Wallet ledger error:", walletErr);
+      }
       await prisma.settings.delete({ where: { key: recordKey } }).catch(() => {});
       return { processed: true, alreadyProcessed: true };
     }
@@ -288,6 +299,12 @@ async function processPending(pending: PendingPayment, recordKey: string) {
         paymentReference: pending.ref ?? verifiedRef
       }
     });
+
+    try {
+      await orderService.recordDirectPurchaseWalletTransaction(order.id);
+    } catch (walletErr) {
+      console.error("[Moolre reconcile] Wallet ledger error:", walletErr);
+    }
 
     try {
       const { dataProviderService } = await import(

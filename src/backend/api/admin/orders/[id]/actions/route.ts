@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/backend/lib/middleware/admin";
 import { prisma } from "@/backend/lib/db/prisma";
 import { dataProviderService } from "@/backend/services/dataProvider/dataProviderService";
+import { orderService } from "@/backend/services/orders/orderService";
 import { enqueueWebhookIfStatusChanged } from "@/backend/services/reseller/statusHooks";
 
 type ActionType = "resend" | "cancel" | "complete" | "cancel_refund" | "deduct_wallet";
@@ -183,6 +184,16 @@ export async function POST(
           processedBy: adminId ?? null
         }
       });
+      try {
+        await orderService.recordDirectPurchaseWalletTransaction(id);
+      } catch (walletErr) {
+        console.error("[Admin actions] Wallet ledger error:", walletErr);
+      }
+      try {
+        await orderService.grantRewardsForCompletedOrder(id);
+      } catch (rewardErr) {
+        console.error("[Admin actions] Reward grant error:", rewardErr);
+      }
       try {
         const { sendOrderCompleteSms } = await import("@/backend/services/smsNotifications");
         await sendOrderCompleteSms(id);

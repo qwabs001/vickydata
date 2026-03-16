@@ -4,6 +4,8 @@ import { toLocalGhanaPhone } from "@/backend/lib/utils/phoneFormatter";
 
 const generateOrderNumber = () => `GH-${Date.now()}`;
 const ACTIVE_SERIALIZED_ORDER_STATUSES = ["PENDING", "PROCESSING"] as const;
+const buildDirectPurchaseWalletDescription = (orderNumber: string) =>
+  `Bundle purchase (${orderNumber})`;
 
 async function findBlockingPaidDuplicateOrder(
   tx: Prisma.TransactionClient,
@@ -197,22 +199,30 @@ export const orderService = {
     if (!order || order.status !== "COMPLETED") return;
 
     const netAmount = order.amount;
-    const user = order.user;
 
     await prisma.$transaction(async (tx) => {
+      const currentUser = await tx.user.findUnique({
+        where: { id: order.userId },
+        select: { referredById: true, username: true, referralRewardedAt: true }
+      });
+      const rewardState = await tx.order.findUnique({
+        where: { id: order.id },
+        select: { rewardEarned: true }
+      });
+
       // Referral cashback (0.5%) to referrer - ONLY on first payment/order
-      if (user?.referredById && netAmount > 0 && !user.referralRewardedAt) {
+      if (currentUser?.referredById && netAmount > 0 && !currentUser.referralRewardedAt) {
         const referralReward = Math.round(netAmount * 0.005 * 100) / 100;
         if (referralReward > 0) {
           const existing = await tx.rewardsBalance.findUnique({
-            where: { userId: user.referredById }
+            where: { userId: currentUser.referredById }
           });
           const before = existing?.currentBalance ?? 0;
           const after = Math.round((before + referralReward) * 100) / 100;
           await tx.rewardsBalance.upsert({
-            where: { userId: user.referredById },
+            where: { userId: currentUser.referredById },
             create: {
-              userId: user.referredById,
+              userId: currentUser.referredById,
               totalEarned: referralReward,
               totalSpent: 0,
               totalWithdrawn: 0,
@@ -225,13 +235,13 @@ export const orderService = {
           });
           await tx.rewardsTransaction.create({
             data: {
-              userId: user.referredById,
+              userId: currentUser.referredById,
               orderId: order.id,
               type: "EARNED",
               amount: referralReward,
               balanceBefore: before,
               balanceAfter: after,
-              description: `Referral cashback (0.5%) from ${user.username ?? "referred user"}'s first order`,
+              description: `Referral cashback (0.5%) from ${currentUser.username ?? "referred user"}'s first order`,
               referenceNumber: `REF-${Date.now()}-${Math.floor(Math.random() * 1000)}`
             }
           });
@@ -244,7 +254,7 @@ export const orderService = {
       }
 
       // Purchase cashback (1%) to buyer
-      if (netAmount > 0) {
+      if (netAmount > 0 && (rewardState?.rewardEarned ?? 0) <= 0) {
         const rewardEarned = Math.round(netAmount * 0.01 * 100) / 100;
         const existing = await tx.rewardsBalance.findUnique({
           where: { userId: order.userId }
@@ -281,6 +291,53 @@ export const orderService = {
           where: { id: orderId },
           data: { rewardEarned }
         });
+      }
+    });
+  },
+
+  /** Record non-wallet purchases in wallet history without affecting wallet balance. */
+  async recordDirectPurchaseWalletTransaction(orderId: string): Promise<void> {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        userId: true,
+        orderNumber: true,
+        amount: true,
+        paymentStatus: true,
+        paymentMethod: true
+      }
+    });
+
+    if (!order || order.paymentStatus !== "COMPLETED" || order.amount <= 0) return;
+    if (order.paymentMethod === "WALLET") return;
+
+    const description = buildDirectPurchaseWalletDescription(order.orderNumber);
+    const existing = await prisma.walletTransaction.findFirst({
+      where: {
+        userId: order.userId,
+        type: "SPENT",
+        description
+      },
+      select: { id: true }
+    });
+
+    if (existing) return;
+
+    const wallet = await prisma.walletBalance.findUnique({
+      where: { userId: order.userId },
+      select: { currentBalance: true }
+    });
+    const balanceSnapshot = wallet?.currentBalance ?? 0;
+
+    await prisma.walletTransaction.create({
+      data: {
+        userId: order.userId,
+        type: "SPENT",
+        amount: order.amount,
+        balanceBefore: balanceSnapshot,
+        balanceAfter: balanceSnapshot,
+        description
       }
     });
   },

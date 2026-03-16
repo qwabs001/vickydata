@@ -1871,6 +1871,13 @@ async function markOrderCompleted(
 
   try {
     const { orderService } = await import("@/backend/services/orders/orderService");
+    await orderService.recordDirectPurchaseWalletTransaction(orderId);
+  } catch (walletErr) {
+    console.error("[provider] Wallet ledger error:", walletErr);
+  }
+
+  try {
+    const { orderService } = await import("@/backend/services/orders/orderService");
     await orderService.grantRewardsForCompletedOrder(orderId);
   } catch (rewardErr) {
     console.error("[provider] Reward grant error:", rewardErr);

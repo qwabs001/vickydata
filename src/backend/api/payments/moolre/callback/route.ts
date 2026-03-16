@@ -583,6 +583,12 @@ async function handleCallback(request: NextRequest) {
             }
           }).catch(() => {});
         }
+
+        try {
+          await orderService.recordDirectPurchaseWalletTransaction(order.id);
+        } catch (walletErr) {
+          console.error("[Moolre callback] Wallet ledger error:", walletErr);
+        }
       }
 
       if (orderId) {

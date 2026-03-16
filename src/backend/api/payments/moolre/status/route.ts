@@ -91,6 +91,11 @@ export async function GET(request: Request) {
         existingOrder.status === "COMPLETED"
       )
     ) {
+      try {
+        await orderService.recordDirectPurchaseWalletTransaction(existingOrder.id);
+      } catch (walletErr) {
+        console.error("[Moolre status] Wallet ledger error:", walletErr);
+      }
       return NextResponse.json({
         status: "completed",
         type: "order",
@@ -267,6 +272,12 @@ export async function GET(request: Request) {
             lastError: null
           }
         }).catch(() => {});
+      }
+
+      try {
+        await orderService.recordDirectPurchaseWalletTransaction(order.id);
+      } catch (walletErr) {
+        console.error("[Moolre status] Wallet ledger error:", walletErr);
       }
 
       try {
