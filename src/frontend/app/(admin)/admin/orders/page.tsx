@@ -29,6 +29,16 @@ const shortOrderId = (orderNumber: string) => {
   return suffix || "-----";
 };
 
+type OrderAction =
+  | "resend"
+  | "cancel"
+  | "complete"
+  | "cancel_refund"
+  | "deduct_wallet"
+  | "mark_pending"
+  | "mark_inprogress"
+  | "delete";
+
 const shortenReason = (reason: string, maxLen = 62) => {
   const trimmed = reason.trim();
   if (trimmed.length <= maxLen) return trimmed;
@@ -107,7 +117,7 @@ export default function Page() {
       if (dateRange === "This year") return parsed.getFullYear() === referenceDate.getFullYear();
       return true;
     };
-      return orders.filter((order) => {
+    return orders.filter((order) => {
       const statusLabel = statusMap[order.status] ?? order.status;
       const matchesSearch =
         !query ||
@@ -138,6 +148,10 @@ export default function Page() {
   useEffect(() => {
     setOrdersPage(1);
   }, [search, statusFilter, networkFilter, dateRange]);
+
+  useEffect(() => {
+    setOrdersPage((current) => Math.min(current, ordersTotalPages));
+  }, [ordersTotalPages]);
 
   const handleRefresh = () => {
     if (user?.id) {
@@ -182,8 +196,11 @@ export default function Page() {
     }
   };
 
-  const handleOrderAction = async (orderId: string, action: "resend" | "cancel" | "complete" | "cancel_refund" | "deduct_wallet") => {
+  const handleOrderAction = async (orderId: string, action: OrderAction) => {
     if (!user?.id) return;
+    if (action === "delete" && !window.confirm("Delete this order permanently? This cannot be undone.")) {
+      return;
+    }
     setActionLoadingId(orderId);
     setError(null);
     try {
@@ -195,6 +212,10 @@ export default function Page() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data?.error ?? "Action failed.");
+        return;
+      }
+      if (action === "delete") {
+        setOrders((current) => current.filter((order) => order.id !== orderId));
         return;
       }
       handleRefresh();
@@ -321,6 +342,8 @@ export default function Page() {
               const planLabel = order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "Plan";
               const canRefund = order.paymentStatus === "COMPLETED" && order.paymentStatus !== "REFUNDED";
               const canResend = order.status !== "COMPLETED";
+              const canMarkPending = order.status !== "PENDING" && order.status !== "COMPLETED";
+              const canMarkInprogress = order.status !== "PROCESSING" && order.status !== "COMPLETED";
               return (
                 <div key={order.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
@@ -404,6 +427,22 @@ export default function Page() {
                             <button
                               type="button"
                               className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                              onClick={() => handleOrderAction(order.id, "mark_pending")}
+                              disabled={!canMarkPending || actionLoadingId === order.id}
+                            >
+                              Mark Pending
+                            </button>
+                            <button
+                              type="button"
+                              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                              onClick={() => handleOrderAction(order.id, "mark_inprogress")}
+                              disabled={!canMarkInprogress || actionLoadingId === order.id}
+                            >
+                              Mark Inprogress
+                            </button>
+                            <button
+                              type="button"
+                              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                               onClick={() => handleOrderAction(order.id, "complete")}
                               disabled={actionLoadingId === order.id}
                             >
@@ -436,6 +475,14 @@ export default function Page() {
                                 Deduct wallet (fix)
                               </button>
                             ) : null}
+                            <button
+                              type="button"
+                              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                              onClick={() => handleOrderAction(order.id, "delete")}
+                              disabled={actionLoadingId === order.id}
+                            >
+                              Delete
+                            </button>
                           </div>
                         ) : null}
                       </div>
@@ -474,6 +521,8 @@ export default function Page() {
                   const planLabel = order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "Plan";
                   const canRefund = order.paymentStatus === "COMPLETED" && order.paymentStatus !== "REFUNDED";
                   const canResend = order.status !== "COMPLETED";
+                  const canMarkPending = order.status !== "PENDING" && order.status !== "COMPLETED";
+                  const canMarkInprogress = order.status !== "PROCESSING" && order.status !== "COMPLETED";
                   return (
                     <tr key={order.id} className="border-t border-slate-100">
                       <td className="px-4 py-4 font-semibold text-slate-700" title={order.orderNumber}>
@@ -539,6 +588,22 @@ export default function Page() {
                               <button
                                 type="button"
                                 className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                onClick={() => handleOrderAction(order.id, "mark_pending")}
+                                disabled={!canMarkPending || actionLoadingId === order.id}
+                              >
+                                Mark Pending
+                              </button>
+                              <button
+                                type="button"
+                                className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                onClick={() => handleOrderAction(order.id, "mark_inprogress")}
+                                disabled={!canMarkInprogress || actionLoadingId === order.id}
+                              >
+                                Mark Inprogress
+                              </button>
+                              <button
+                                type="button"
+                                className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                                 onClick={() => handleOrderAction(order.id, "complete")}
                                 disabled={actionLoadingId === order.id}
                               >
@@ -571,6 +636,14 @@ export default function Page() {
                                   Deduct wallet (fix)
                                 </button>
                               ) : null}
+                              <button
+                                type="button"
+                                className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                                onClick={() => handleOrderAction(order.id, "delete")}
+                                disabled={actionLoadingId === order.id}
+                              >
+                                Delete
+                              </button>
                             </div>
                           ) : null}
                         </div>

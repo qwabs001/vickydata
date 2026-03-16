@@ -1912,7 +1912,7 @@ async function markOrderFailed(
       status: { in: ["PENDING", "PROCESSING"] }
     },
     data: {
-      status: "FAILED",
+      status: "PENDING",
       failedReason,
       completedAt: null,
       apiRequestPayload,
@@ -2002,7 +2002,7 @@ async function syncOrderStatusInternal(orderId: string): Promise<{ ok: boolean; 
       normalizeJsonObject(order.apiRequestPayload ?? {}),
       normalizeJsonObject(statusPayload)
     );
-    return { ok: false, status: "FAILED", error: reason };
+    return { ok: false, status: "PENDING", error: reason };
   }
 
   await prisma.order.updateMany({
@@ -2857,7 +2857,7 @@ export const dataProviderService = {
               _purchasePath: resolvedPurchasePath
             })
           );
-          return { ok: false, error: failedReason, reference, status: "FAILED" };
+          return { ok: false, error: failedReason, reference, status: "PENDING" };
         }
 
         if (providerState === "COMPLETED") {
@@ -2908,7 +2908,7 @@ export const dataProviderService = {
         normalizeJsonObject(payload)
       );
 
-      return { ok: false, error: friendlyMsg, status: "FAILED" };
+      return { ok: false, error: friendlyMsg, status: "PENDING" };
     }
   },
 

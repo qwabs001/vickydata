@@ -20,12 +20,8 @@ import { isValidGhanaPhone } from "@/shared/utils/validators";
 
 
 const PAGE_SIZE = 7;
-const isProviderBalanceFailure = (reason?: string | null) =>
-  Boolean(reason && reason.toLowerCase().includes("insufficient balance"));
 const getOrderDisplayStatus = (order: { status: string; failedReason?: string | null }) => {
-  if (order.status === "FAILED" && isProviderBalanceFailure(order.failedReason)) {
-    return "In Progress";
-  }
+  if (order.status === "FAILED") return "Pending";
   if (order.status === "COMPLETED") return "Completed";
   if (order.status === "PROCESSING") return "In Progress";
   if (order.status === "PENDING") return "Pending";

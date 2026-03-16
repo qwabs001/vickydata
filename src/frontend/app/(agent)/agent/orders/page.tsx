@@ -25,7 +25,7 @@ const statusMap: Record<string, string> = {
   COMPLETED: "Completed",
   PROCESSING: "In Progress",
   PENDING: "Pending",
-  FAILED: "Failed",
+  FAILED: "Pending",
   CANCELLED: "Failed"
 };
 
@@ -49,11 +49,12 @@ const formatTime = (value: string) => {
 };
 
 const getStatusLabel = (status: string) => statusMap[status] ?? status;
-const isProviderBalanceFailure = (reason?: string | null) =>
-  Boolean(reason && reason.toLowerCase().includes("insufficient balance"));
 const getDisplayStatus = (order: OrderSummary) => {
-  if (order.status === "FAILED" && isProviderBalanceFailure(order.failedReason)) {
-    return "In Progress";
+  if (order.status === "CANCELLED") {
+    return "Failed";
+  }
+  if (order.status === "FAILED") {
+    return "Pending";
   }
   return getStatusLabel(order.status);
 };

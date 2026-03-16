@@ -5,7 +5,15 @@ import { dataProviderService } from "@/backend/services/dataProvider/dataProvide
 import { orderService } from "@/backend/services/orders/orderService";
 import { enqueueWebhookIfStatusChanged } from "@/backend/services/reseller/statusHooks";
 
-type ActionType = "resend" | "cancel" | "complete" | "cancel_refund" | "deduct_wallet";
+type ActionType =
+  | "resend"
+  | "cancel"
+  | "complete"
+  | "cancel_refund"
+  | "deduct_wallet"
+  | "mark_pending"
+  | "mark_inprogress"
+  | "delete";
 
 async function notifyResellerOrderStatusChange(orderId: string): Promise<void> {
   try {
@@ -140,7 +148,19 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const action = body?.action as ActionType | undefined;
 
-    if (!action || !["resend", "cancel", "complete", "cancel_refund", "deduct_wallet"].includes(action)) {
+    if (
+      !action ||
+      ![
+        "resend",
+        "cancel",
+        "complete",
+        "cancel_refund",
+        "deduct_wallet",
+        "mark_pending",
+        "mark_inprogress",
+        "delete"
+      ].includes(action)
+    ) {
       return NextResponse.json({ error: "Invalid action." }, { status: 400 });
     }
 
@@ -204,6 +224,34 @@ export async function POST(
       return NextResponse.json({ ok: true });
     }
 
+    if (action === "mark_inprogress") {
+      await prisma.order.update({
+        where: { id },
+        data: {
+          status: "PROCESSING",
+          failedReason: null,
+          completedAt: null,
+          processedBy: adminId ?? null
+        }
+      });
+      await notifyResellerOrderStatusChange(id);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "mark_pending") {
+      await prisma.order.update({
+        where: { id },
+        data: {
+          status: "PENDING",
+          failedReason: null,
+          completedAt: null,
+          processedBy: adminId ?? null
+        }
+      });
+      await notifyResellerOrderStatusChange(id);
+      return NextResponse.json({ ok: true });
+    }
+
     if (action === "deduct_wallet") {
       if (order.paymentMethod === "WALLET") {
         return NextResponse.json({ error: "Order already paid from wallet." }, { status: 400 });
@@ -259,7 +307,7 @@ export async function POST(
     }
 
     if (action === "cancel_refund") {
-    if (order.paymentStatus !== "COMPLETED" && order.paymentMethod !== "WALLET") {
+      if (order.paymentStatus !== "COMPLETED" && order.paymentMethod !== "WALLET") {
         return NextResponse.json({ error: "Payment not completed." }, { status: 400 });
       }
       if (order.paymentStatus === "REFUNDED") {
@@ -286,6 +334,21 @@ export async function POST(
       });
 
       await notifyResellerOrderStatusChange(id);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "delete") {
+      await prisma.$transaction(async (tx) => {
+        await tx.transaction.deleteMany({
+          where: { orderId: id }
+        });
+        await tx.rewardsTransaction.deleteMany({
+          where: { orderId: id }
+        });
+        await tx.order.delete({
+          where: { id }
+        });
+      });
       return NextResponse.json({ ok: true });
     }
 
