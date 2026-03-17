@@ -117,7 +117,7 @@ export default function Page() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/users?includeAgents=true&limit=300", {
+      const response = await fetch("/api/users?includeAgents=true&limit=1000", {
         headers: { "x-user-id": user.id },
         cache: "no-store"
       });

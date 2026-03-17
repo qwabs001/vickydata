@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       roleParam === "AGENT" || roleParam === "ADMIN" || roleParam === "CUSTOMER"
         ? roleParam
         : "CUSTOMER";
-    const limitParam = Math.min(500, Math.max(1, Number(searchParams.get("limit") ?? "500") || 500));
+    const limitParam = Math.min(2000, Math.max(1, Number(searchParams.get("limit") ?? "1000") || 1000));
     const whereClause: Prisma.UserWhereInput =
       roleFilter === "CUSTOMER" && includeAgents
         ? { role: { in: ["CUSTOMER", "AGENT"] } }

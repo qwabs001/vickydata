@@ -74,7 +74,7 @@ export async function GET(request: Request) {
         include: {
           network: true,
           dataPlan: true,
-          user: scope === "all" ? { select: { id: true, username: true, phoneNumber: true } } : false
+          user: scope === "all" ? { select: { id: true, username: true, fullName: true, phoneNumber: true } } : false
         },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
@@ -116,6 +116,7 @@ export async function GET(request: Request) {
           ? {
               id: order.user.id,
               username: order.user.username,
+              fullName: order.user.fullName ?? null,
               phoneNumber: order.user.phoneNumber
             }
           : undefined

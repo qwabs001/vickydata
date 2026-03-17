@@ -45,6 +45,15 @@ const shortenReason = (reason: string, maxLen = 62) => {
   return `${trimmed.slice(0, maxLen - 1)}…`;
 };
 
+const getOrderCustomerName = (order: { user?: { fullName?: string | null; username?: string | null; phoneNumber?: string | null } }) => {
+  const fullName = order.user?.fullName?.trim();
+  if (fullName) return fullName;
+  const username = order.user?.username?.trim();
+  if (username) return username;
+  const phoneNumber = order.user?.phoneNumber?.trim();
+  return phoneNumber || "Customer";
+};
+
 export default function Page() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
@@ -122,7 +131,7 @@ export default function Page() {
       const matchesSearch =
         !query ||
         order.orderNumber.toLowerCase().includes(query) ||
-        (order.user?.username ?? "").toLowerCase().includes(query) ||
+        getOrderCustomerName(order).toLowerCase().includes(query) ||
         (order.user?.phoneNumber ?? "").toLowerCase().includes(query) ||
         (order.network?.displayName ?? "").toLowerCase().includes(query) ||
         (order.dataPlan?.name ?? "").toLowerCase().includes(query);
@@ -355,10 +364,10 @@ export default function Page() {
                         {order.user ? (
                           <button
                             type="button"
-                            onClick={() => openUserOrders(order.user.id, order.user.username ?? "Customer")}
+                            onClick={() => openUserOrders(order.user.id, getOrderCustomerName(order))}
                             className="font-semibold text-[#2563eb] hover:underline"
                           >
-                            {order.user.username ?? "Customer"}
+                            {getOrderCustomerName(order)}
                           </button>
                         ) : (
                           "Customer"
@@ -542,11 +551,11 @@ export default function Page() {
                         {order.user ? (
                           <button
                             type="button"
-                            onClick={() => openUserOrders(order.user.id, order.user.username ?? "Customer")}
+                            onClick={() => openUserOrders(order.user.id, getOrderCustomerName(order))}
                             className="block w-full truncate text-left font-semibold text-[#2563eb] hover:underline"
-                            title={order.user.username ?? "Customer"}
+                            title={getOrderCustomerName(order)}
                           >
-                            {order.user.username ?? "Customer"}
+                            {getOrderCustomerName(order)}
                           </button>
                         ) : (
                           "Customer"

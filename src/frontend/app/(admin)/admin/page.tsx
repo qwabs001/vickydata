@@ -26,6 +26,15 @@ function shortOrderId(orderNumber: string) {
   return cleaned.slice(-5) || "-----";
 }
 
+function getOrderCustomerName(order: { user?: { fullName?: string | null; username?: string | null; phoneNumber?: string | null } }) {
+  const fullName = order.user?.fullName?.trim();
+  if (fullName) return fullName;
+  const username = order.user?.username?.trim();
+  if (username) return username;
+  const phoneNumber = order.user?.phoneNumber?.trim();
+  return phoneNumber || "Customer";
+}
+
 function isRevenueOrder(order: { status?: string; paymentStatus?: string }) {
   return (
     order.paymentStatus === "COMPLETED" &&
@@ -176,7 +185,7 @@ export default function Page() {
             onClick={() => {
               const rows = orders.map((order) => ({
                 OrderNumber: order.orderNumber,
-                Customer: order.user?.username ?? order.user?.phoneNumber ?? "",
+                Customer: getOrderCustomerName(order),
                 Phone: order.user?.phoneNumber ?? "",
                 Network: order.network?.displayName ?? order.network?.name ?? "",
                 Plan: order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "",
@@ -318,7 +327,7 @@ export default function Page() {
                         #{shortOrderId(order.orderNumber)}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
-                        {order.user?.username ?? "Customer"}
+                        {getOrderCustomerName(order)}
                         <div className="text-xs text-slate-400">{order.user?.phoneNumber}</div>
                       </td>
                       <td className="px-4 py-3 text-slate-600">{order.network?.displayName ?? order.network?.name}</td>
