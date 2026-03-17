@@ -175,6 +175,14 @@ export async function POST(request: Request) {
     }
 
     const { userId, networkId, dataPlanId, recipientNumber, rewardToUse, useWallet } = parsed.data;
+    const requesterId = request.headers.get("x-user-id");
+    if (requesterId !== userId) {
+      const auth = await requireAdmin(request);
+      if (!auth.ok) {
+        return NextResponse.json({ error: "You are not allowed to create orders for this user." }, { status: 403 });
+      }
+    }
+
     const plan = await prisma.dataPlan.findUnique({
       where: { id: dataPlanId }
     });
@@ -222,6 +230,9 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Order create error:", error);
     const message = error instanceof Error ? error.message : "Unable to create order.";
+    if (message === "Insufficient wallet balance.") {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

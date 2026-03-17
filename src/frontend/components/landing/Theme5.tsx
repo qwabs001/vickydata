@@ -455,7 +455,10 @@ const Theme5: React.FC = () => {
 
         const orderResponse = await fetch("/api/orders", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": user.id
+          },
           body: JSON.stringify({
             userId: user.id,
             networkId: selectedNetwork.id,

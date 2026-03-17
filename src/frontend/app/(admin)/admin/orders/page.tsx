@@ -496,16 +496,26 @@ export default function Page() {
 
         <div className="mt-6 hidden overflow-visible rounded-2xl border border-slate-100 md:block">
           <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col style={{ width: "12.5%" }} />
+              <col style={{ width: "12.5%" }} />
+              <col style={{ width: "12.5%" }} />
+              <col style={{ width: "12.5%" }} />
+              <col style={{ width: "12.5%" }} />
+              <col style={{ width: "12.5%" }} />
+              <col style={{ width: "12.5%" }} />
+              <col style={{ width: "12.5%" }} />
+            </colgroup>
             <thead className="bg-[#f8fafc] text-xs uppercase text-slate-400">
               <tr>
-                <th className="w-[12%] px-4 py-4 text-left">Order ID</th>
-                <th className="w-[14%] px-4 py-4 text-left">Customer</th>
-                <th className="w-[12%] px-4 py-4 text-left">Recipient</th>
-                <th className="w-[8%] px-4 py-4 text-left">Network</th>
-                <th className="w-[6%] px-4 py-4 text-left">Plan</th>
-                <th className="w-[8%] px-4 py-4 text-left">Amount</th>
-                <th className="w-[32%] px-4 py-4 text-left">Status</th>
-                <th className="w-[8%] px-4 py-4 text-left">Actions</th>
+                <th className="px-4 py-4 text-left">Order ID</th>
+                <th className="px-4 py-4 text-left">Customer</th>
+                <th className="px-4 py-4 text-left">Recipient</th>
+                <th className="px-4 py-4 text-left">Network</th>
+                <th className="px-4 py-4 text-left">Plan</th>
+                <th className="px-4 py-4 text-left">Amount</th>
+                <th className="px-4 py-4 text-left">Status</th>
+                <th className="px-4 py-4 text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -526,38 +536,57 @@ export default function Page() {
                   return (
                     <tr key={order.id} className="border-t border-slate-100">
                       <td className="px-4 py-4 font-semibold text-slate-700" title={order.orderNumber}>
-                        #{shortOrderId(order.orderNumber)}
+                        <span className="block truncate">#{shortOrderId(order.orderNumber)}</span>
                       </td>
                       <td className="px-4 py-4 text-slate-600">
                         {order.user ? (
                           <button
                             type="button"
                             onClick={() => openUserOrders(order.user.id, order.user.username ?? "Customer")}
-                            className="text-left font-semibold text-[#2563eb] hover:underline"
+                            className="block w-full truncate text-left font-semibold text-[#2563eb] hover:underline"
+                            title={order.user.username ?? "Customer"}
                           >
                             {order.user.username ?? "Customer"}
                           </button>
                         ) : (
                           "Customer"
                         )}
-                        <div className="text-xs text-slate-400">{order.user?.phoneNumber}</div>
+                        <div className="truncate text-xs text-slate-400" title={order.user?.phoneNumber ?? "—"}>
+                          {order.user?.phoneNumber}
+                        </div>
                       </td>
-                      <td className="px-4 py-4 text-slate-600">{order.recipientNumber ?? "—"}</td>
-                      <td className="px-4 py-4 text-slate-600">{order.network?.displayName ?? order.network?.name}</td>
-                      <td className="px-4 py-4 text-slate-600">{planLabel}</td>
-                      <td className="px-4 py-4 text-slate-900 font-semibold">{order.currency} {order.amount.toFixed(2)}</td>
+                      <td className="px-4 py-4 text-slate-600" title={order.recipientNumber ?? "—"}>
+                        <span className="block truncate">{order.recipientNumber ?? "—"}</span>
+                      </td>
+                      <td className="px-4 py-4 text-slate-600" title={order.network?.displayName ?? order.network?.name ?? "—"}>
+                        <span className="block truncate">{order.network?.displayName ?? order.network?.name}</span>
+                      </td>
+                      <td className="px-4 py-4 text-slate-600" title={planLabel}>
+                        <span className="block truncate">{planLabel}</span>
+                      </td>
+                      <td className="px-4 py-4 text-slate-900 font-semibold" title={`${order.currency} ${order.amount.toFixed(2)}`}>
+                        <span className="block truncate">{order.currency} {order.amount.toFixed(2)}</span>
+                      </td>
                       <td className="px-4 py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[statusLabel] ?? "bg-slate-100 text-slate-600"}`}>
+                        <div className="flex min-w-0 flex-col gap-2">
+                          <span className={`inline-flex h-7 w-[102px] items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[statusLabel] ?? "bg-slate-100 text-slate-600"}`}>
                             {statusLabel}
                           </span>
                           {order.status === "FAILED" && order.failedReason ? (
-                            <span
-                              className="max-w-[340px] truncate text-[11px] text-rose-600"
-                              title={order.failedReason}
-                            >
-                              {shortenReason(order.failedReason, 78)}
-                            </span>
+                            <div className="flex min-w-0 items-start gap-2">
+                              <span className="min-w-0 flex-1 truncate text-[11px] text-rose-600" title={order.failedReason}>
+                                {shortenReason(order.failedReason, 22)}
+                              </span>
+                              <button
+                                type="button"
+                                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-[11px] font-bold text-rose-600"
+                                title={order.failedReason}
+                                onClick={() => setMobileReason(order.failedReason)}
+                                aria-label="View full failure reason"
+                              >
+                                ?
+                              </button>
+                            </div>
                           ) : null}
                         </div>
                       </td>
