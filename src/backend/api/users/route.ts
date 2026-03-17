@@ -55,6 +55,7 @@ export async function GET(request: Request) {
         users: users.map((user) => ({
           id: user.id,
           username: user.username ?? user.phoneNumber,
+          fullName: user.fullName ?? null,
           phoneNumber: user.phoneNumber,
           role: user.role,
           status: user.status,
@@ -69,7 +70,7 @@ export async function GET(request: Request) {
           vip: Boolean((user.preferences as { vip?: boolean } | null)?.vip)
         }))
       },
-      { headers: { "Cache-Control": "private, max-age=10, stale-while-revalidate=20" } }
+      { headers: { "Cache-Control": "private, max-age=0, no-store" } }
     );
   } catch (error) {
     console.error("User list error:", error);

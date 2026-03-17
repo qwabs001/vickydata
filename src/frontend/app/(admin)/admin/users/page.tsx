@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { formatCurrency } from "@/shared/utils/formatters";
 import { downloadCsv } from "@/frontend/lib/exportCsv";
@@ -112,57 +112,64 @@ export default function Page() {
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
   const [usersPage, setUsersPage] = useState(1);
 
-  useEffect(() => {
-    const loadUsers = async () => {
-      if (!user?.id) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch("/api/users?includeAgents=true&limit=300", {
-          headers: { "x-user-id": user.id }
-        });
-        const data = await response.json().catch(() => null);
-        if (!response.ok) {
-          setError(data?.error ?? "Unable to load users.");
-          setUsers([]);
-          return;
-        }
-
-        const now = Date.now();
-        const rows = (data?.users ?? []).map((user: any) => {
-          const createdAt = new Date(user.createdAt);
-          const isNew = now - createdAt.getTime() < 7 * 24 * 60 * 60 * 1000;
-          const status = getStatusLabel(user.status, user.vip);
-          const name = user.username ?? user.phoneNumber;
-          return {
-            id: user.id,
-            name,
-            initials: getInitials(name),
-            phone: user.phoneNumber,
-            role: user.role,
-            joined: formatJoined(user.createdAt),
-            orders: user.ordersCount ?? 0,
-            referrals: user.referralsCount ?? 0,
-            balance: user.rewardsBalance ?? 0,
-            walletBalance: user.walletBalance ?? 0,
-            walletSpent: user.walletSpent ?? 0,
-            walletAdded: user.walletAdded ?? 0,
-            status,
-            isNew,
-            vip: Boolean(user.vip)
-          };
-        });
-        setUsers(rows);
-      } catch {
-        setError("Unable to load users.");
+  const loadUsers = useCallback(async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/users?includeAgents=true&limit=300", {
+        headers: { "x-user-id": user.id },
+        cache: "no-store"
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(data?.error ?? "Unable to load users.");
         setUsers([]);
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
 
-    loadUsers();
+      const now = Date.now();
+      const rows = (data?.users ?? []).map((u: any) => {
+        const createdAt = new Date(u.createdAt);
+        const isNew = now - createdAt.getTime() < 7 * 24 * 60 * 60 * 1000;
+        const status = getStatusLabel(u.status, u.vip);
+        const name = (u.fullName && u.fullName.trim()) ? u.fullName.trim() : (u.username ?? u.phoneNumber);
+        return {
+          id: u.id,
+          name,
+          initials: getInitials(name),
+          phone: u.phoneNumber,
+          role: u.role,
+          joined: formatJoined(u.createdAt),
+          orders: u.ordersCount ?? 0,
+          referrals: u.referralsCount ?? 0,
+          balance: u.rewardsBalance ?? 0,
+          walletBalance: u.walletBalance ?? 0,
+          walletSpent: u.walletSpent ?? 0,
+          walletAdded: u.walletAdded ?? 0,
+          status,
+          isNew,
+          vip: Boolean(u.vip)
+        };
+      });
+      setUsers(rows);
+    } catch {
+      setError("Unable to load users.");
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
   }, [user?.id]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  useEffect(() => {
+    const onFocus = () => loadUsers();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadUsers]);
 
   const stats = useMemo(() => {
     const total = users.length;
@@ -179,11 +186,15 @@ export default function Page() {
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const queryWords = query ? query.split(/\s+/).filter(Boolean) : [];
     return users.filter((user) => {
+      const nameNorm = (user.name ?? "").trim().toLowerCase();
+      const phoneNorm = (user.phone ?? "").trim().toLowerCase();
       const matchesSearch =
         !query ||
-        user.name.toLowerCase().includes(query) ||
-        user.phone.toLowerCase().includes(query);
+        nameNorm.includes(query) ||
+        phoneNorm.includes(query) ||
+        (queryWords.length > 0 && queryWords.every((word) => nameNorm.includes(word) || phoneNorm.includes(word)));
       const matchesStatus =
         statusFilter === "All" || user.status === statusFilter;
       return matchesSearch && matchesStatus;
@@ -439,6 +450,14 @@ export default function Page() {
           <p className="text-sm text-slate-500">Manage users and promoted agents in one list</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 disabled:opacity-60"
+            disabled={loading}
+            onClick={() => loadUsers()}
+          >
+            {loading ? "Loading…" : "Refresh"}
+          </button>
           <button
             className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600"
             onClick={() => {
