@@ -1,6 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/backend/lib/db/prisma";
+import { isDatabaseConnectionError } from "@/backend/lib/utils/dbError";
 import { comparePassword, hashPassword } from "@/backend/lib/utils/hash";
+import {
+  isPhoneLoginIdentity,
+  normalizePhoneNumber,
+  normalizeUsername
+} from "@/backend/services/auth/authIdentity";
 
 export const authService = {
   async ensureDevAdmin(username: string, password: string) {
@@ -9,8 +15,9 @@ export const authService = {
     const adminUsername = "Bomzydget2@gmail.com";
     const adminPhone = "0200000000";
     const adminPassword = "Orange$1234";
+    const normalizedUsername = normalizeUsername(username);
 
-    if (username !== adminUsername || password !== adminPassword) {
+    if (normalizedUsername.toLowerCase() !== adminUsername.toLowerCase() || password !== adminPassword) {
       return null;
     }
 
@@ -50,9 +57,14 @@ export const authService = {
     referralCode?: string | null
   ) {
     try {
+      const normalizedUsername = normalizeUsername(username);
+      const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
       const existing = await prisma.user.findFirst({
         where: {
-          OR: [{ username }, { phoneNumber }]
+          OR: [
+            { username: { equals: normalizedUsername, mode: "insensitive" } },
+            { phoneNumber: normalizedPhoneNumber }
+          ]
         }
       });
       if (existing) {
@@ -66,8 +78,8 @@ export const authService = {
       const hashed = await hashPassword(password);
       const user = await prisma.user.create({
         data: {
-          username,
-          phoneNumber,
+          username: normalizedUsername,
+          phoneNumber: normalizedPhoneNumber,
           password: hashed,
           role: "CUSTOMER",
           status: "ACTIVE",
@@ -76,11 +88,7 @@ export const authService = {
       });
       return { ok: true, user } as const;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (error instanceof Prisma.PrismaClientInitializationError) {
-        return { ok: false, reason: "Service temporarily unavailable. Please try again in a moment." } as const;
-      }
-      if (errorMessage.includes("MaxClientsInSessionMode") || errorMessage.includes("connection")) {
+      if (isDatabaseConnectionError(error)) {
         return { ok: false, reason: "Service temporarily unavailable. Please try again in a moment." } as const;
       }
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -95,27 +103,46 @@ export const authService = {
 
   async validateUser(username: string, password: string) {
     try {
-      const user = await prisma.user.findUnique({ where: { username } });
+      const normalizedUsername = normalizeUsername(username);
+      let user = await prisma.user.findFirst({
+        where: {
+          username: {
+            equals: normalizedUsername,
+            mode: "insensitive"
+          }
+        }
+      });
+
+      if (!user && isPhoneLoginIdentity(normalizedUsername)) {
+        user = await prisma.user.findUnique({
+          where: {
+            phoneNumber: normalizePhoneNumber(normalizedUsername)
+          }
+        });
+      }
+
       if (!user) return null;
       const valid = await comparePassword(password, user.password);
       return valid ? user : null;
     } catch (error) {
-      // Re-throw connection errors so the route can handle them appropriately
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes("MaxClientsInSessionMode") || msg.includes("connection")) {
+      if (isDatabaseConnectionError(error)) {
         throw error;
       }
-      // For other errors, return null (user not found/invalid)
       console.error("[AuthService] validateUser error:", error);
       return null;
     }
   },
 
   async resetPassword(username: string, phoneNumber: string, password: string) {
+    const normalizedUsername = normalizeUsername(username);
+    const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
     const user = await prisma.user.findFirst({
       where: {
-        username,
-        phoneNumber
+        username: {
+          equals: normalizedUsername,
+          mode: "insensitive"
+        },
+        phoneNumber: normalizedPhoneNumber
       }
     });
     if (!user) {

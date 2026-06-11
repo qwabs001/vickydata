@@ -11,9 +11,13 @@ export function isDatabaseConnectionError(error: unknown): boolean {
   return (
     lower.includes("maxclientsinsessionmode") ||
     lower.includes("connection") ||
+    lower.includes("enotfound") ||
     lower.includes("econnrefused") ||
     lower.includes("econnreset") ||
     lower.includes("connection refused") ||
+    lower.includes("tenant/user") ||
+    lower.includes("could not translate host name") ||
+    lower.includes("timeout") ||
     lower.includes("pool")
   );
 }
