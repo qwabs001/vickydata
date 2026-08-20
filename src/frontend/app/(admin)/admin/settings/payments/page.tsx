@@ -29,7 +29,7 @@ export default function Page() {
   const appUrl =
     typeof window !== "undefined"
       ? window.location.origin
-      : process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://bundlearena.com";
+      : process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://vickydata.com";
   const callbackUrl = `${appUrl.replace(/\/$/, "")}/api/payments/moolre/callback`;
 
   const loadSettings = useCallback(async () => {

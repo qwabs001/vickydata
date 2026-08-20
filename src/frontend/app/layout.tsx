@@ -7,8 +7,8 @@ import { ContactWidget } from "@/frontend/components/ContactWidget";
 import { getBrandTheme, hexToRgbString } from "@/backend/lib/theme";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "900"] });
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://bundlearena.com").replace(/\/$/, "");
-const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "BundleArena";
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://vickydata.com").replace(/\/$/, "");
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "VickyData";
 
 export async function generateMetadata(): Promise<Metadata> {
   const theme = await getBrandTheme();

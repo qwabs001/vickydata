@@ -6,6 +6,11 @@ import { orderService } from "@/backend/services/orders/orderService";
 import { resolvePriceForUser } from "@/backend/services/agentPricingService";
 import { orderCreateSchema } from "@/shared/schemas/order.schema";
 
+const getCustomerVisibleStatus = (status: string) => {
+  if (status === "FAILED") return "PENDING";
+  return status;
+};
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -83,15 +88,17 @@ export async function GET(request: Request) {
       shouldPaginate ? prisma.order.count({ where: whereClause }) : Promise.resolve(null)
     ]);
 
+    const shouldMaskFailureFromUser = scope !== "all";
     const cacheForCustomer = scope !== "all" ? "private, max-age=10, stale-while-revalidate=20" : undefined;
     return NextResponse.json(
       {
       orders: orders.map((order) => ({
         id: order.id,
         orderNumber: order.orderNumber,
-        status: order.status,
+        status: shouldMaskFailureFromUser ? getCustomerVisibleStatus(order.status) : order.status,
         paymentStatus: order.paymentStatus,
-        failedReason: order.failedReason ?? null,
+        paymentMethod: order.paymentMethod ?? null,
+        failedReason: shouldMaskFailureFromUser ? null : order.failedReason ?? null,
         amount: order.amount,
         currency: order.currency,
         recipientNumber: order.recipientNumber,

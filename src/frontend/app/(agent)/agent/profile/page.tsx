@@ -418,7 +418,7 @@ export default function AgentProfilePage() {
         >
           Logout
         </button>
-        <p className="mt-4 text-center text-xs text-slate-400">BundleArena App v2.4.0</p>
+        <p className="mt-4 text-center text-xs text-slate-400">VickyData App v2.4.0</p>
       </div>
 
       <div className="hidden md:flex md:flex-col gap-6">

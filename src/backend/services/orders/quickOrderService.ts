@@ -46,7 +46,7 @@ export const quickOrderService = {
       process.env.NEXT_PUBLIC_SITE_URL ??
       process.env.NEXT_PUBLIC_APP_URL ??
       process.env.APP_URL ??
-      "https://bundlearena.com"
+      "https://vickydata.com"
     ).replace(/\/$/, "");
     const callbackUrl = `${appUrl}/api/payments/moolre/callback`;
     const returnUrl = `${appUrl}/dashboard?payment=success`;

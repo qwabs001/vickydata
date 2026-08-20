@@ -16,7 +16,9 @@ interface UserRow {
   initials: string;
   phone: string;
   role: UserRole;
+  joinedAt: string;
   joined: string;
+  joinedTime: string;
   orders: number;
   referrals: number;
   balance: number;
@@ -64,6 +66,12 @@ const formatJoined = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const formatJoinedTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 };
 
 const getStatusLabel = (status: string, vip: boolean) => {
@@ -140,7 +148,9 @@ export default function Page() {
           initials: getInitials(name),
           phone: u.phoneNumber,
           role: u.role,
+          joinedAt: u.createdAt,
           joined: formatJoined(u.createdAt),
+          joinedTime: formatJoinedTime(u.createdAt),
           orders: u.ordersCount ?? 0,
           referrals: u.referralsCount ?? 0,
           balance: u.rewardsBalance ?? 0,
@@ -229,7 +239,7 @@ export default function Page() {
     setEditForm({
       name: user.name,
       phone: user.phone,
-      joined: user.joined,
+      joined: `${user.joined} ${user.joinedTime}`.trim(),
       orders: user.orders.toString(),
       balance: user.balance.toFixed(2),
       role: user.role,
@@ -363,7 +373,7 @@ export default function Page() {
 
       if (typeof window !== "undefined") {
         window.localStorage.setItem(
-          "bundlearena.auth.adminBackup",
+          "vickydata.auth.adminBackup",
           JSON.stringify({
             id: user.id,
             username: user.username,
@@ -583,7 +593,10 @@ export default function Page() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-slate-500">{user.joined}</td>
+                    <td className="px-4 py-4 text-slate-500">
+                      <div>{user.joined}</div>
+                      <div className="text-xs text-slate-400">{user.joinedTime}</div>
+                    </td>
                     <td className="px-4 py-4 text-slate-700">{user.orders}</td>
                     <td className="px-4 py-4">
                       {user.referrals > 0 ? (

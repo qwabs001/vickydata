@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 
-const DEFAULT_SECRET_NAMESPACE = "bundlearena-reseller-api";
+const DEFAULT_SECRET_NAMESPACE = "vickydata-reseller-api";
 
 function getBaseSecret(): string {
   return (

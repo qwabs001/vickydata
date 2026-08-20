@@ -1,4 +1,4 @@
-# Supabase Database Setup (bundlearena.com)
+# Supabase Database Setup (vickydata.com)
 
 To fix "max clients reached" and enable login, use the **pooled** connection string.
 

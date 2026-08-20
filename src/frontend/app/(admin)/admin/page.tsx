@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/shared/utils/formatters";
 import { useAuth } from "@/frontend/hooks/useAuth";
@@ -45,119 +45,203 @@ function isRevenueOrder(order: { status?: string; paymentStatus?: string }) {
 
 export default function Page() {
   const { user } = useAuth();
-  const [orders, setOrders] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [networks, setNetworks] = useState<{ id: string; name: string; displayName: string }[]>([]);
+  const refreshInFlightRef = useRef(false);
+  const [dashboard, setDashboard] = useState<{
+    summary: {
+      totalRevenue: number;
+      paidOrdersCount: number;
+      activeOrdersCount: number;
+      totalCustomersCount: number;
+      activeCustomersCount: number;
+      rewardsLiability: number;
+      ordersToday: number;
+    };
+    topNetworks: Array<{ id: string; label: string; amount: number }>;
+    revenueChartData: Array<{ label: string; value: number; date: string }>;
+    recentOrders: any[];
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const loadData = useCallback(async (options?: { silent?: boolean }) => {
+    if (!user?.id || refreshInFlightRef.current) return;
+
+    const silent = options?.silent ?? false;
+    refreshInFlightRef.current = true;
+    setError(null);
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const response = await fetch("/api/admin/dashboard", {
+        headers: { "x-user-id": user.id },
+        cache: "no-store"
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(data?.error ?? "Unable to load dashboard data.");
+        if (!silent) {
+          setDashboard(null);
+        }
+        return;
+      }
+      setDashboard(data);
+      setLastUpdatedAt(new Date().toISOString());
+    } catch {
+      setError("Unable to load dashboard data.");
+      if (!silent) {
+        setDashboard(null);
+      }
+    } finally {
+      refreshInFlightRef.current = false;
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [user?.id]);
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!user?.id) return;
-      setError(null);
-      setLoading(true);
-      try {
-        const [ordersResponse, usersResponse, networksResponse] = await Promise.all([
-          fetch("/api/orders?scope=all&limit=300", { headers: { "x-user-id": user.id } }),
-          fetch("/api/users?includeAgents=true&limit=300", { headers: { "x-user-id": user.id } }),
-          fetch("/api/networks?scope=all", { headers: { "x-user-id": user.id } })
-        ]);
-        const ordersData = await ordersResponse.json().catch(() => null);
-        const usersData = await usersResponse.json().catch(() => null);
-        const networksData = await networksResponse.json().catch(() => null);
-        if (!ordersResponse.ok) setError(ordersData?.error ?? "Unable to load orders.");
-        else setOrders(Array.isArray(ordersData?.orders) ? ordersData.orders : ordersData ?? []);
-        if (!usersResponse.ok) setError(usersData?.error ?? "Unable to load users.");
-        else setUsers(Array.isArray(usersData?.users) ? usersData.users : usersData ?? []);
-        if (networksResponse.ok && Array.isArray(networksData)) {
-          setNetworks(networksData.map((n: { id: string; name: string; displayName: string }) => ({ id: n.id, name: n.name, displayName: n.displayName ?? n.name })));
-        }
-      } catch {
-        setError("Unable to load dashboard data.");
-      } finally {
-        setLoading(false);
+    if (!user?.id) return;
+
+    void loadData();
+
+    const intervalId = window.setInterval(() => {
+      void loadData({ silent: true });
+    }, 5000);
+
+    const handleFocus = () => {
+      void loadData({ silent: true });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadData({ silent: true });
       }
     };
 
-    loadData();
-  }, [user?.id]);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadData, user?.id]);
 
   const metrics = useMemo(() => {
-    const revenueOrders = orders.filter((o) => isRevenueOrder(o));
-    const totalRevenue = revenueOrders.reduce((sum, o) => sum + Number(o.amount ?? 0), 0);
-    const activeOrders = orders.filter((o) => o.status === "PROCESSING" || o.status === "PENDING").length;
-    const uniqueCustomers = users.length;
-    const rewardsLiability = totalRevenue * 0.01;
-    const today = new Date().toDateString();
-    const ordersToday = orders.filter((o) => new Date(o.createdAt).toDateString() === today).length;
+    const summary = dashboard?.summary;
+    if (!summary) return [];
 
     return [
       {
         label: "Total Revenue",
-        value: formatCurrency(totalRevenue, "GHS"),
-        trend: revenueOrders.length > 0 ? `${revenueOrders.length} paid` : "—",
+        value: formatCurrency(summary.totalRevenue, "GHS"),
+        trend: summary.paidOrdersCount > 0 ? `${summary.paidOrdersCount} paid` : "—",
         accent: "bg-[#e7efff] text-[#2563eb]"
       },
       {
         label: "Active Orders",
-        value: String(activeOrders),
-        trend: ordersToday > 0 ? `+${ordersToday} today` : "—",
+        value: String(summary.activeOrdersCount),
+        trend: summary.ordersToday > 0 ? `+${summary.ordersToday} today` : "—",
         accent: "bg-[#fff6dd] text-[#f59e0b]"
       },
       {
-        label: "Active Users",
-        value: uniqueCustomers.toLocaleString("en-US"),
-        trend: uniqueCustomers > 0 ? `${uniqueCustomers} customers` : "—",
+        label: "Customers",
+        value: summary.totalCustomersCount.toLocaleString("en-US"),
+        trend: summary.activeCustomersCount > 0 ? `${summary.activeCustomersCount} active` : "—",
         accent: "bg-[#ecfdf3] text-[#16a34a]"
       },
       {
         label: "Rewards Liability",
-        value: formatCurrency(rewardsLiability, "GHS"),
+        value: formatCurrency(summary.rewardsLiability, "GHS"),
         trend: "~1% of revenue",
         accent: "bg-[#f1f5f9] text-[#0f172a]"
       }
     ];
-  }, [orders, users]);
+  }, [dashboard]);
 
   const topNetworks = useMemo(() => {
-    const totals: Record<string, number> = {};
-    orders.filter((o) => isRevenueOrder(o)).forEach((order) => {
-      const label = order.network?.displayName ?? order.network?.name ?? "Unknown";
-      totals[label] = (totals[label] ?? 0) + Number(order.amount ?? 0);
-    });
-    const totalAmount = Object.values(totals).reduce((sum, v) => sum + v, 0) || 1;
-    const fromOrders = Object.entries(totals)
-      .map(([label, amount]) => ({
-        label,
-        share: `${Math.round((amount / totalAmount) * 100)}%`,
-        amount: formatCurrency(amount, "GHS")
-      }))
-      .sort((a, b) => Number(b.share.replace("%", "")) - Number(a.share.replace("%", "")));
-    if (fromOrders.length > 0) return fromOrders;
-    return networks.map((n) => ({
-      label: n.displayName ?? n.name,
-      share: "0%",
-      amount: formatCurrency(0, "GHS")
+    const items = dashboard?.topNetworks ?? [];
+    const totalAmount = items.reduce((sum, item) => sum + Number(item.amount ?? 0), 0) || 1;
+    return items.map((item) => ({
+      label: item.label,
+      share: `${Math.round((Number(item.amount ?? 0) / totalAmount) * 100)}%`,
+      amount: formatCurrency(item.amount, "GHS")
     }));
-  }, [orders, networks]);
+  }, [dashboard]);
 
   const revenueChartData = useMemo(() => {
-    const days: { label: string; value: number; date: string }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
-      const dayLabel = d.toLocaleDateString("en-GB", { weekday: "short" });
-      const dayRevenue = orders
-        .filter((o) => isRevenueOrder(o) && o.createdAt?.slice(0, 10) === dateStr)
-        .reduce((sum, o) => sum + Number(o.amount ?? 0), 0);
-      days.push({ label: dayLabel, value: dayRevenue, date: dateStr });
-    }
+    const days = dashboard?.revenueChartData ?? [];
     const maxVal = Math.max(...days.map((d) => d.value), 1);
     return days.map((d) => ({ ...d, heightPct: (d.value / maxVal) * 100 }));
-  }, [orders]);
+  }, [dashboard]);
 
-  const recentOrders = useMemo(() => orders.slice(0, 4), [orders]);
+  const recentOrders = useMemo(() => dashboard?.recentOrders ?? [], [dashboard]);
+  const syncLabel = useMemo(() => {
+    if (loading && !dashboard) return "Loading";
+    if (refreshing) return "Syncing";
+    if (!lastUpdatedAt) return "Live";
+    const date = new Date(lastUpdatedAt);
+    if (Number.isNaN(date.getTime())) return "Live";
+    return `Updated ${date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    })}`;
+  }, [dashboard, lastUpdatedAt, loading, refreshing]);
+
+  const handleExport = async () => {
+    if (!user?.id || exporting) return;
+    setExporting(true);
+    try {
+      const response = await fetch("/api/orders?scope=all&limit=500", {
+        headers: { "x-user-id": user.id },
+        cache: "no-store"
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(data?.error ?? "Unable to export orders.");
+        setExporting(false);
+        return;
+      }
+      const orders = Array.isArray(data?.orders) ? data.orders : [];
+      const rows = orders.map((order: any) => ({
+        OrderNumber: order.orderNumber,
+        Customer: getOrderCustomerName(order),
+        Phone: order.user?.phoneNumber ?? "",
+        Network: order.network?.displayName ?? order.network?.name ?? "",
+        Plan: order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "",
+        Amount: order.amount,
+        Currency: order.currency,
+        Status: order.status,
+        CreatedAt: order.createdAt
+      }));
+      downloadCsv("orders.csv", rows, [
+        "OrderNumber",
+        "Customer",
+        "Phone",
+        "Network",
+        "Plan",
+        "Amount",
+        "Currency",
+        "Status",
+        "CreatedAt"
+      ]);
+    } catch {
+      setError("Unable to export orders.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
@@ -176,38 +260,22 @@ export default function Page() {
           <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 sm:px-4">
             <span className="hidden sm:inline">System Status</span>
             <span className="flex items-center gap-1 text-emerald-600">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Online
+              <span className={`h-2 w-2 rounded-full ${refreshing ? "bg-amber-500" : "bg-emerald-500"}`} />
+              {syncLabel}
             </span>
           </div>
           <button
-            className="rounded-full bg-[#0f172a] px-4 py-2 text-xs font-semibold text-white"
-            onClick={() => {
-              const rows = orders.map((order) => ({
-                OrderNumber: order.orderNumber,
-                Customer: getOrderCustomerName(order),
-                Phone: order.user?.phoneNumber ?? "",
-                Network: order.network?.displayName ?? order.network?.name ?? "",
-                Plan: order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "",
-                Amount: order.amount,
-                Currency: order.currency,
-                Status: order.status,
-                CreatedAt: order.createdAt
-              }));
-              downloadCsv("orders.csv", rows, [
-                "OrderNumber",
-                "Customer",
-                "Phone",
-                "Network",
-                "Plan",
-                "Amount",
-                "Currency",
-                "Status",
-                "CreatedAt"
-              ]);
-            }}
+            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600"
+            onClick={() => void loadData({ silent: true })}
+            type="button"
           >
-            Export
+            Refresh
+          </button>
+          <button
+            className="rounded-full bg-[#0f172a] px-4 py-2 text-xs font-semibold text-white"
+            onClick={handleExport}
+          >
+            {exporting ? "Exporting..." : "Export"}
           </button>
           <Link href="/admin/agents" className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">
             Agents

@@ -25,6 +25,7 @@ yarn-error.log*
 # Local env files
 .env*.local
 .env
+SUPABASE_DATABASE_URL.txt
 
 # Vercel
 .vercel
@@ -34,7 +35,13 @@ yarn-error.log*
 next-env.d.ts
 
 # Prisma
-prisma/migrations/
+prisma/migrations/*
+!prisma/migrations/20260812000000_add_datafraternity_package_id/
+!prisma/migrations/20260812000000_add_datafraternity_package_id/migration.sql
+!prisma/migrations/20260813000000_prevent_duplicate_provider_dispatch/
+!prisma/migrations/20260813000000_prevent_duplicate_provider_dispatch/migration.sql
+!prisma/migrations/20260813000001_track_provider_dispatch_source/
+!prisma/migrations/20260813000001_track_provider_dispatch_source/migration.sql
 
 # Backup folders
 node_modules.bak.*/

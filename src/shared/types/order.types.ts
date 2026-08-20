@@ -10,6 +10,7 @@ export interface OrderSummary {
   recipientNumber: string;
   createdAt: string;
   paymentStatus?: PaymentStatus;
+  paymentMethod?: string | null;
   failedReason?: string | null;
   network?: {
     id: string;

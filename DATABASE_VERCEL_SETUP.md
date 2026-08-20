@@ -33,18 +33,18 @@ NEXTAUTH_URL=https://your-domain.vercel.app
 
 ### 4. App Configuration (REQUIRED)
 ```env
-APP_URL=https://bundlearena.com
-APP_NAME=BundleArena
+APP_URL=https://vickydata.com
+APP_NAME=VickyData
 NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
-NEXT_PUBLIC_SITE_URL=https://bundlearena.com
-NEXT_PUBLIC_APP_NAME=BundleArena
+NEXT_PUBLIC_SITE_URL=https://vickydata.com
+NEXT_PUBLIC_APP_NAME=VickyData
 NODE_ENV=production
 ```
 
 ## How to Set Environment Variables in Vercel
 
 1. Go to your Vercel Dashboard: https://vercel.com/dashboard
-2. Select your project: **bundlearena**
+2. Select your project: **vickydata**
 3. Navigate to **Settings** → **Environment Variables**
 4. Add each variable above:
    - **Key**: `DATABASE_URL`

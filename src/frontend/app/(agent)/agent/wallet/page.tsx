@@ -6,6 +6,9 @@ import { Dialog } from "@/frontend/components/ui/dialog";
 import { useWallet } from "@/frontend/hooks/useWallet";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { formatCurrency } from "@/shared/utils/formatters";
+import type { OrderSummary } from "@/shared/types";
+
+const PAGE_SIZE = 7;
 
 type WalletTransaction = {
   id: string;
@@ -17,32 +20,73 @@ type WalletTransaction = {
   createdAt: string;
 };
 
+type WalletActivity = {
+  id: string;
+  title: string;
+  description: string;
+  createdAt: string;
+  amount: number;
+  amountPrefix: "+" | "-";
+  amountClassName: string;
+  source: string;
+};
+
+const isBundlePurchaseWalletTransaction = (item: WalletTransaction) =>
+  item.type === "SPENT" &&
+  (
+    item.description === "Paid for bundle" ||
+    item.description === "Spent on bundle" ||
+    item.description.startsWith("Bundle purchase (") ||
+    item.description.startsWith("Admin correction: paid for order") ||
+    item.description.startsWith("Reseller API order ")
+  );
+
+const getOrderStatusLabel = (status: string) => {
+  if (status === "PROCESSING") return "In Progress";
+  if (status === "FAILED") return "Pending";
+  if (status === "CANCELLED") return "Cancelled";
+  return status.charAt(0) + status.slice(1).toLowerCase();
+};
+
+const getOrderSourceLabel = (order: OrderSummary) =>
+  order.paymentMethod === "WALLET" ? "Paid from wallet" : "Paid directly";
+
 export default function AgentWalletPage() {
   const { user } = useAuth();
-  const { balance, loading, addFunds, refresh } = useWallet();
+  const { balance, loading } = useWallet();
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletAmount, setWalletAmount] = useState("");
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
   const [walletAddSubmitting, setWalletAddSubmitting] = useState(false);
+  const [walletPage, setWalletPage] = useState(1);
 
   const loadTransactions = useCallback(async () => {
     if (!user?.id) {
       setTransactions([]);
+      setOrders([]);
       return;
     }
     setTransactionsLoading(true);
     try {
-      const response = await fetch(`/api/wallet/transactions?userId=${user.id}`);
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        setTransactions([]);
-        return;
-      }
-      setTransactions(data?.transactions ?? []);
+      const [transactionsResponse, ordersResponse] = await Promise.all([
+        fetch(`/api/wallet/transactions?userId=${user.id}`),
+        fetch(`/api/orders?userId=${user.id}&limit=200`, {
+          headers: { "x-user-id": user.id }
+        })
+      ]);
+      const [transactionsData, ordersData] = await Promise.all([
+        transactionsResponse.json().catch(() => null),
+        ordersResponse.json().catch(() => null)
+      ]);
+
+      setTransactions(transactionsResponse.ok ? (transactionsData?.transactions ?? []) : []);
+      setOrders(ordersResponse.ok ? (ordersData?.orders ?? []) : []);
     } catch {
       setTransactions([]);
+      setOrders([]);
     } finally {
       setTransactionsLoading(false);
     }
@@ -68,11 +112,67 @@ export default function AgentWalletPage() {
     const totalAdded = transactions
       .filter((item) => item.type === "ADDED")
       .reduce((sum, item) => sum + item.amount, 0);
-    const totalSpent = transactions
-      .filter((item) => item.type === "SPENT")
-      .reduce((sum, item) => sum + item.amount, 0);
-    return { totalAdded, totalSpent };
-  }, [transactions]);
+    const totalPurchases = orders.reduce((sum, item) => sum + item.amount, 0);
+    return { totalAdded, totalPurchases };
+  }, [orders, transactions]);
+
+  const activities = useMemo<WalletActivity[]>(() => {
+    const walletActivities = transactions
+      .filter((item) => !isBundlePurchaseWalletTransaction(item))
+      .map((item) => {
+        const isCredit = item.type === "ADDED";
+        const amountPrefix: WalletActivity["amountPrefix"] = isCredit ? "+" : "-";
+        const isRefund = item.description.startsWith("Refund:");
+        const isAdmin = item.description.startsWith("Admin ");
+        const title = isRefund
+          ? "Refund"
+          : isCredit
+            ? "Wallet Top Up"
+            : isAdmin
+              ? "Admin Adjustment"
+              : "Wallet Debit";
+
+        return {
+          id: `wallet-${item.id}`,
+          title,
+          description: item.description,
+          createdAt: item.createdAt,
+          amount: item.amount,
+          amountPrefix,
+          amountClassName: isCredit ? "text-emerald-600" : "text-rose-500",
+          source: "Wallet"
+        };
+      });
+
+    const orderActivities = orders.map((order) => {
+      const planLabel = order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "Bundle";
+      const networkLabel = order.network?.displayName ?? order.network?.name ?? "";
+      return {
+        id: `order-${order.id}`,
+        title: "Bundle Purchase",
+        description: [order.orderNumber, networkLabel, planLabel, order.recipientNumber, getOrderStatusLabel(order.status)]
+          .filter(Boolean)
+          .join(" • "),
+        createdAt: order.createdAt,
+        amount: order.amount,
+        amountPrefix: "-" as const,
+        amountClassName: "text-rose-500",
+        source: getOrderSourceLabel(order)
+      };
+    });
+
+    return [...walletActivities, ...orderActivities].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [orders, transactions]);
+  const walletTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(activities.length / PAGE_SIZE)),
+    [activities.length]
+  );
+  const visibleWalletTransactions = useMemo(() => {
+    const start = (walletPage - 1) * PAGE_SIZE;
+    return activities.slice(start, start + PAGE_SIZE);
+  }, [activities, walletPage]);
 
   const formatDate = (value: string) => {
     const date = new Date(value);
@@ -125,9 +225,9 @@ export default function AgentWalletPage() {
               </p>
             </div>
             <div className="rounded-2xl bg-white/10 px-3 py-3 text-xs">
-              <p className="text-white/70">Total Spent</p>
+              <p className="text-white/70">Total Purchases</p>
               <p className="mt-2 text-sm font-semibold">
-                {formatCurrency(summary.totalSpent, "GHS")}
+                {formatCurrency(summary.totalPurchases, "GHS")}
               </p>
             </div>
           </div>
@@ -143,24 +243,22 @@ export default function AgentWalletPage() {
         <section className="mt-6 rounded-3xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold text-slate-900">Wallet Transactions</h2>
-              <p className="text-xs text-slate-500">Deposits and bundle deductions.</p>
+              <h2 className="text-base font-semibold text-slate-900">Wallet Activity</h2>
+              <p className="text-xs text-slate-500">Top-ups and all bundle purchases.</p>
             </div>
           </div>
           <div className="mt-4 space-y-3">
             {transactionsLoading ? (
               <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
-                Loading transactions...
+                Loading activity...
               </div>
             ) : null}
-            {!transactionsLoading && transactions.length === 0 ? (
+            {!transactionsLoading && activities.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
-                No wallet transactions yet.
+                No wallet activity yet.
               </div>
             ) : null}
-            {transactions.map((item) => {
-              const isCredit = item.type === "ADDED";
-              const isAdmin = item.description?.startsWith("Admin ");
+            {activities.map((item) => {
               return (
                 <div
                   key={item.id}
@@ -169,14 +267,17 @@ export default function AgentWalletPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">
-                        {item.type === "ADDED" ? "Wallet Top Up" : isAdmin ? "Admin Adjustment" : "Bundle Purchase"}
+                        {item.title}
                       </p>
                       <p className="text-xs text-slate-500">
                         {formatDate(item.createdAt)} • {formatTime(item.createdAt)}
                       </p>
+                      <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                        {item.source}
+                      </p>
                     </div>
-                    <span className={`text-sm font-semibold ${isCredit ? "text-emerald-600" : "text-rose-500"}`}>
-                      {isCredit ? "+" : "-"}
+                    <span className={`text-sm font-semibold ${item.amountClassName}`}>
+                      {item.amountPrefix}
                       {item.amount.toFixed(2)} GHS
                     </span>
                   </div>
@@ -193,7 +294,7 @@ export default function AgentWalletPage() {
           <div>
             <h1 className="text-2xl font-black text-slate-900">Wallet</h1>
             <p className="text-sm text-slate-500">
-              Track deposits and wallet payments for bundle purchases.
+              Track wallet activity and every bundle purchase record.
             </p>
           </div>
           <button
@@ -223,7 +324,7 @@ export default function AgentWalletPage() {
               </div>
               <div className="rounded-2xl bg-white/60 px-4 py-4 text-sm">
                 <p className="text-xs font-semibold text-[#0f172a]/60">Total Spent</p>
-                <p className="mt-2 text-lg font-bold">{formatCurrency(summary.totalSpent, "GHS")}</p>
+                <p className="mt-2 text-lg font-bold">{formatCurrency(summary.totalPurchases, "GHS")}</p>
               </div>
             </div>
           </div>
@@ -238,9 +339,9 @@ export default function AgentWalletPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Total Spent</span>
+                <span>Total Purchases</span>
                 <span className="font-semibold text-slate-900">
-                  {formatCurrency(summary.totalSpent, "GHS")}
+                  {formatCurrency(summary.totalPurchases, "GHS")}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -256,9 +357,9 @@ export default function AgentWalletPage() {
         <section className="rounded-3xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-6 py-5">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Wallet Transactions</h2>
+              <h2 className="text-lg font-bold text-slate-900">Wallet Activity</h2>
               <p className="text-sm text-slate-500">
-                Only deposits and bundle deductions.
+                Top-ups and all bundle purchases.
               </p>
             </div>
           </div>
@@ -277,39 +378,32 @@ export default function AgentWalletPage() {
                 {transactionsLoading ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-500">
-                      Loading transactions...
+                      Loading activity...
                     </td>
                   </tr>
                 ) : null}
-                {!transactionsLoading && transactions.length === 0 ? (
+                {!transactionsLoading && activities.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-500">
-                      No wallet transactions yet.
+                      No wallet activity yet.
                     </td>
                   </tr>
                 ) : null}
-                {transactions.map((item) => {
-                  const isCredit = item.type === "ADDED";
-                  const isAdmin = item.description?.startsWith("Admin ");
-                  const label = item.type === "ADDED"
-                    ? "Deposited"
-                    : isAdmin
-                      ? "Admin Adjustment"
-                      : "Bundle Purchase";
+                {activities.map((item) => {
                   return (
                     <tr key={item.id} className="border-t border-slate-100">
                       <td className="px-6 py-4">
                         <div className="text-sm font-semibold text-slate-700">{formatDate(item.createdAt)}</div>
                         <div className="text-xs text-slate-400">{formatTime(item.createdAt)}</div>
                       </td>
-                      <td className="px-6 py-4 text-slate-700">{label}</td>
+                      <td className="px-6 py-4 text-slate-700">{item.title}</td>
                       <td className="px-6 py-4 text-slate-500">{item.description}</td>
-                      <td className={`px-6 py-4 font-semibold ${isCredit ? "text-emerald-600" : "text-rose-500"}`}>
-                        {isCredit ? "+" : "-"}
+                      <td className={`px-6 py-4 font-semibold ${item.amountClassName}`}>
+                        {item.amountPrefix}
                         {item.amount.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 font-semibold text-slate-900">
-                        {formatCurrency(item.balanceAfter, "GHS")}
+                        {item.source}
                       </td>
                     </tr>
                   );

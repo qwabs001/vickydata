@@ -3,9 +3,7 @@ import { prisma } from "@/backend/lib/db/prisma";
 
 const LOGO_KEY = "brand.logo";
 const THEME_KEY = "brand.theme";
-const DEFAULT_LOGO_URL = "/images/brand/bundlearena-icon.png";
-const LEGACY_LOGO_URL = `/images/networks/${["kel", "data", "gh"].join("")}.png`;
-const PREVIOUS_DEFAULT_LOGO_URL = "/images/networks/bundlearena.png";
+const DEFAULT_LOGO_URL = "/images/brand/vickydata-icon.png";
 
 export const DEFAULT_ACCENT = "#f6c500";
 export const DEFAULT_PRIMARY = "#2563eb";
@@ -46,10 +44,7 @@ export const getBrandTheme = cache(async (): Promise<BrandTheme> => {
     return {
       accent: themeValue?.accent ?? DEFAULT_ACCENT,
       primary: themeValue?.primary ?? DEFAULT_PRIMARY,
-      logoUrl:
-        resolvedLogoUrl === LEGACY_LOGO_URL || resolvedLogoUrl === PREVIOUS_DEFAULT_LOGO_URL
-          ? DEFAULT_LOGO_URL
-          : resolvedLogoUrl || DEFAULT_LOGO_URL
+      logoUrl: resolvedLogoUrl || DEFAULT_LOGO_URL
     };
   } catch (error) {
     console.error("Brand theme fetch error:", error);

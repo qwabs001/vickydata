@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/frontend/hooks/useAuth";
 import apiClient from "@/frontend/lib/apiClient";
 import type { DataPlan } from "@/shared/types";
 
@@ -87,21 +88,51 @@ const fetchNetworkPlans = async (networkId: string) => {
 };
 
 export function useDataPlans(networkId?: string | null, networkName?: string | null) {
+  const { user } = useAuth();
   const [plans, setPlans] = useState<DataPlan[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (user?.id) return;
     // Warm the public plans cache once so selecting a network can render instantly.
     void fetchAllPublicPlans().catch(() => {
       // no-op: network-scoped fetch will still run when needed
     });
-  }, []);
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (!networkId) {
       setPlans([]);
       setLoading(false);
       return;
+    }
+
+    if (user?.id) {
+      let active = true;
+      setLoading(true);
+      apiClient
+        .get<DataPlan[]>("/data-plans", {
+          params: {
+            networkId,
+            userId: user.id
+          }
+        })
+        .then((response) => {
+          if (!active) return;
+          setPlans(Array.isArray(response.data) ? response.data : []);
+        })
+        .catch(() => {
+          if (!active) return;
+          setPlans([]);
+        })
+        .finally(() => {
+          if (!active) return;
+          setLoading(false);
+        });
+
+      return () => {
+        active = false;
+      };
     }
 
     const cachedNetworkPlans = getFreshPlansForNetwork(networkId);
@@ -138,7 +169,7 @@ export function useDataPlans(networkId?: string | null, networkName?: string | n
     return () => {
       active = false;
     };
-  }, [networkId, networkName]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [networkId, networkName, user?.id, user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { plans, loading };
 }

@@ -35,7 +35,8 @@ const getOrderDisplayStatus = (order: { status: string; failedReason?: string | 
   if (order.status === "COMPLETED") return "Completed";
   if (order.status === "PROCESSING") return "In Progress";
   if (order.status === "PENDING") return "Pending";
-  return "Failed";
+  if (order.status === "CANCELLED") return "Cancelled";
+  return "Cancelled";
 };
 
 export default function AgentDashboardPage() {
@@ -600,13 +601,17 @@ function statusLabel(status: string): string {
   if (status === "PROCESSING") return "In Progress";
   if (status === "COMPLETED") return "Completed";
   if (status === "PENDING") return "Pending";
-  return "Failed";
+  if (status === "FAILED") return "Pending";
+  if (status === "CANCELLED") return "Cancelled";
+  return "Cancelled";
 }
 
 function statusBadge(status: string): string {
   if (status === "COMPLETED") return "bg-[#ecfdf3] text-[#16a34a]";
   if (status === "PROCESSING") return "bg-[#fff6dd] text-[#f59e0b]";
   if (status === "PENDING") return "bg-slate-100 text-slate-600";
+  if (status === "FAILED") return "bg-slate-100 text-slate-600";
+  if (status === "CANCELLED") return "bg-[#fee2e2] text-[#ef4444]";
   return "bg-[#fee2e2] text-[#ef4444]";
 }
 

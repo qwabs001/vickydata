@@ -1,4 +1,4 @@
-# BundleArena
+# VickyData
 
 Ultra-simple data bundle purchasing platform for Ghana.
 

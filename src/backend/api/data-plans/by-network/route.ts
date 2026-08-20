@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { dataPlanService } from "@/backend/services/dataPlans/dataPlanService";
 import {
-  applyAgentDiscount,
+  resolveAgentPrice,
   getAgentPricingContext
 } from "@/backend/services/agentPricingService";
 
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const pricedPlans = pricingContext.isAgent
       ? plans.map((plan) => ({
           ...plan,
-          price: applyAgentDiscount(plan.price, pricingContext.discountPercent)
+          price: resolveAgentPrice(plan.price, plan.agentPrice, pricingContext.discountPercent)
         }))
       : plans;
     const cacheHeader = pricingContext.isAgent
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
     const pricedFallback = pricingContext.isAgent
       ? fallback.map((plan) => ({
           ...plan,
-          price: applyAgentDiscount(plan.price, pricingContext.discountPercent)
+          price: resolveAgentPrice(plan.price, null, pricingContext.discountPercent)
         }))
       : fallback;
     return NextResponse.json(pricedFallback);

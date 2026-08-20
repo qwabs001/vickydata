@@ -17,7 +17,7 @@ type AgentCredential = {
   createdAt: string;
 };
 
-const APP_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://bundlearena.com").replace(/\/$/, "");
+const APP_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://vickydata.com").replace(/\/$/, "");
 const BASE_URL = `${APP_URL}/api/v1`;
 
 export default function AgentApiPage() {
@@ -77,7 +77,7 @@ export default function AgentApiPage() {
       <header className="overflow-hidden rounded-3xl border border-slate-200 bg-white px-4 py-5 shadow-sm sm:px-6">
         <h1 className="text-2xl font-black text-slate-900">Reseller API</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Connect your own website or app to BundleArena services, wallet balance, and live order status updates.
+          Connect your own website or app to VickyData services, wallet balance, and live order status updates.
         </p>
       </header>
 

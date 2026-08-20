@@ -13,6 +13,14 @@ type EndpointsConfig = {
 };
 
 const JAYBART_PROVIDER = "jaybart";
+const DATAFRATERNITY_PROVIDER = "datafraternity";
+const DATAFRATERNITY_ENDPOINT_DEFAULTS = {
+  test: "/wallet",
+  offers: "/special-offers",
+  purchase: "/special-offers/orders",
+  status: "/special-offers/orders/{reference}",
+  purchaseMethod: "POST" as const
+};
 const JAYBART_ENDPOINT_DEFAULTS = {
   test: "/check-console-balance",
   networks: "/fetch-networks",
@@ -94,6 +102,13 @@ function getProviderTestCandidatePaths(config: ApiConfiguration, endpoints: Endp
     ]);
   }
 
+  if (isDataFraternityProvider(config)) {
+    return uniqueNonEmptyPaths([
+      resolveDataFraternityEndpoint(endpoints.test, DATAFRATERNITY_ENDPOINT_DEFAULTS.test),
+      resolveDataFraternityEndpoint(endpoints.networks, DATAFRATERNITY_ENDPOINT_DEFAULTS.offers)
+    ]);
+  }
+
   return uniqueNonEmptyPaths([
     endpoints.test,
     endpoints.networks,
@@ -130,8 +145,9 @@ function buildAuthHeaders(baseUrl: string, apiKey?: string, apiSecret?: string):
   const parsedKey = parseApiKey(apiKey);
   const isGhBundle = isGhBundleBaseUrl(baseUrl);
   const isJaybart = isJaybartBaseUrl(baseUrl);
+  const isDataFraternity = isDataFraternityBaseUrl(baseUrl);
   if (parsedKey.raw) {
-    if (isJaybart) {
+    if (isJaybart || isDataFraternity) {
       headers["x-api-key"] = parsedKey.token;
       return headers;
     }
@@ -157,7 +173,7 @@ function buildSignedHeaders(params: {
   apiKey?: string;
   apiSecret?: string;
 }): Record<string, string> {
-  if (isGhBundleBaseUrl(params.baseUrl)) return {};
+  if (isGhBundleBaseUrl(params.baseUrl) || isDataFraternityBaseUrl(params.baseUrl)) return {};
   const parsedKey = parseApiKey(params.apiKey);
   const secret = params.apiSecret?.trim() ?? "";
   if (!secret || secret === parsedKey.token) return {};
@@ -204,19 +220,13 @@ async function getSerializedOrderContext(orderId: string) {
 
 async function findBlockingSerializedOrder(orderId: string) {
   const order = await getSerializedOrderContext(orderId);
-  if (!order?.dataPlan) return null;
+  if (!order) return null;
 
   const activeOrders = await prisma.order.findMany({
     where: {
       recipientNumber: order.recipientNumber,
-      networkId: order.networkId,
       paymentStatus: "COMPLETED",
-      status: { in: [...SERIALIZED_ACTIVE_ORDER_STATUSES] },
-      dataPlan: {
-        is: {
-          dataInMB: order.dataPlan.dataInMB
-        }
-      }
+      status: { in: [...SERIALIZED_ACTIVE_ORDER_STATUSES] }
     },
     select: {
       id: true,
@@ -239,20 +249,14 @@ async function findBlockingSerializedOrder(orderId: string) {
 
 async function findNextQueuedSerializedOrder(orderId: string) {
   const order = await getSerializedOrderContext(orderId);
-  if (!order?.dataPlan) return null;
+  if (!order) return null;
 
   return prisma.order.findFirst({
     where: {
       id: { not: order.id },
       recipientNumber: order.recipientNumber,
-      networkId: order.networkId,
       paymentStatus: "COMPLETED",
-      status: "PENDING",
-      dataPlan: {
-        is: {
-          dataInMB: order.dataPlan.dataInMB
-        }
-      }
+      status: "PENDING"
     },
     select: {
       id: true,
@@ -277,7 +281,12 @@ async function releaseNextQueuedSerializedOrder(orderId: string): Promise<void> 
 }
 
 function getUrl(baseUrl: string, path: string): string {
-  const base = baseUrl.replace(/\/$/, "");
+  // datafraternity.com redirects API calls to app.datafraternity.com. Fetch strips
+  // API-key headers across that origin change, so use the canonical API host directly.
+  const resolvedBaseUrl = isDataFraternityBaseUrl(baseUrl)
+    ? baseUrl.replace("://datafraternity.com", "://app.datafraternity.com")
+    : baseUrl;
+  const base = resolvedBaseUrl.replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;
 }
@@ -453,6 +462,15 @@ const V1_NETWORKS: Array<{ name: string; displayName: string; apiId: number }> =
 
 type PlanDef = { name: string; dataAmount: string; price: number; validity: string };
 type V1NetworkName = "MTN" | "TELECEL" | "ISHARE" | "BIGTIME";
+type DataFraternityOffer = {
+  provider_package_id: string;
+  name: string;
+  data_size: string;
+  network: string;
+  price: string;
+  status: string;
+  provider_status: string;
+};
 
 /* ── Per-network plan catalogs ──
    Comprehensive plan lists for each DataFraternity network.
@@ -599,11 +617,132 @@ function isJaybartProvider(config: { provider: string; baseUrl?: string; endpoin
   return config.provider === JAYBART_PROVIDER || isJaybartBaseUrl(config.baseUrl ?? "");
 }
 
+function isDataFraternityBaseUrl(baseUrl: string): boolean {
+  return baseUrl.toLowerCase().includes("datafraternity.com");
+}
+
+function isDataFraternityProvider(config: { provider: string; baseUrl?: string; endpoints?: unknown }): boolean {
+  return config.provider === DATAFRATERNITY_PROVIDER || isDataFraternityBaseUrl(config.baseUrl ?? "");
+}
+
 function resolveJaybartEndpoint(path: string | undefined, fallback: string): string {
   const normalized = path?.trim() ?? "";
   if (!normalized) return fallback;
   if (GENERIC_LEGACY_ENDPOINTS.has(normalized.toLowerCase())) return fallback;
   return normalized;
+}
+
+function resolveDataFraternityEndpoint(path: string | undefined, fallback: string): string {
+  const normalized = path?.trim() ?? "";
+  if (!normalized || GENERIC_LEGACY_ENDPOINTS.has(normalized.toLowerCase())) return fallback;
+  return normalized;
+}
+
+async function fetchDataFraternityOffers(config: ApiConfiguration): Promise<DataFraternityOffer[]> {
+  const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
+  const path = resolveDataFraternityEndpoint(endpoints.networks ?? endpoints.plans, DATAFRATERNITY_ENDPOINT_DEFAULTS.offers);
+  const payload = await apiRequest<{ data?: DataFraternityOffer[] }>(config.baseUrl, path, {
+    method: "GET",
+    apiKey: config.apiKey,
+    apiSecret: config.apiSecret ?? undefined
+  });
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+function dataAmountToMB(value: string): number {
+  const numeric = Number(value.replace(/[^0-9.]/g, ""));
+  if (!Number.isFinite(numeric) || numeric <= 0) return 1024;
+  const normalized = value.toLowerCase();
+  if (normalized.includes("tb")) return Math.round(numeric * 1024 * 1024);
+  if (normalized.includes("gb")) return Math.round(numeric * 1024);
+  return Math.round(numeric);
+}
+
+async function syncDataFraternityNetworksAndPlans(
+  config: ApiConfiguration,
+  options?: {
+    markupPercent?: number;
+    networkMarkups?: Record<string, number>;
+    planMarkups?: Record<string, number>;
+    networksToImport?: string[];
+    servicesToImport?: Array<{ network: string; plan: string }>;
+    networkLogos?: Record<string, string>;
+  }
+): Promise<{ ok: boolean; networksAdded: number; plansAdded: number; error?: string }> {
+  try {
+    const offers = await fetchDataFraternityOffers(config);
+    const networkMarkups = options?.networkMarkups ?? {};
+    const planMarkups = options?.planMarkups ?? {};
+    const networkLogos = options?.networkLogos ?? {};
+    const allowedNetworks = options?.networksToImport;
+    const allowedPlans = new Map<string, Set<string>>();
+    for (const service of options?.servicesToImport ?? []) {
+      const plans = allowedPlans.get(service.network) ?? new Set<string>();
+      plans.add(service.plan);
+      allowedPlans.set(service.network, plans);
+    }
+    const grouped = new Map<string, DataFraternityOffer[]>();
+    for (const offer of offers) {
+      if (!offer.provider_package_id || !offer.network || offer.status !== "IN_STOCK" || offer.provider_status !== "AVAILABLE") continue;
+      if (allowedNetworks?.length && !allowedNetworks.includes(offer.network)) continue;
+      if (allowedPlans.size > 0 && !allowedPlans.has(offer.network)) continue;
+      const entries = grouped.get(offer.network) ?? [];
+      entries.push(offer);
+      grouped.set(offer.network, entries);
+    }
+
+    let networksAdded = 0;
+    let plansAdded = 0;
+    let sortOrder = 1;
+    for (const [networkName, networkOffers] of grouped) {
+      const network = await prisma.network.upsert({
+        where: { name: networkName },
+        create: {
+          name: networkName,
+          displayName: networkName === "ISHARE" ? "iShare" : networkName === "BIGTIME" ? "BigTime" : networkName === "TELECEL" ? "Telecel" : networkName,
+          logoUrl: networkLogos[networkName]?.trim() || LOGO_MAP[networkName] || "/images/networks/MTN-Logo.png",
+          sortOrder
+        },
+        update: { sortOrder, logoUrl: networkLogos[networkName]?.trim() || LOGO_MAP[networkName] || "/images/networks/MTN-Logo.png" }
+      });
+      networksAdded++;
+      sortOrder++;
+
+      for (let index = 0; index < networkOffers.length; index++) {
+        const offer = networkOffers[index];
+        if (allowedPlans.get(networkName) && !allowedPlans.get(networkName)!.has(offer.name)) continue;
+        const basePrice = Number(offer.price);
+        if (!Number.isFinite(basePrice) || basePrice <= 0) continue;
+        const pct = planMarkups[planKey(networkName, offer.name)] ?? networkMarkups[networkName] ?? options?.markupPercent ?? 0;
+        const price = Math.round(basePrice * (1 + pct / 100) * 100) / 100;
+        await prisma.dataPlan.upsert({
+          where: { networkId_name: { networkId: network.id, name: offer.name } },
+          create: {
+            networkId: network.id,
+            name: offer.name,
+            dataAmount: offer.data_size,
+            dataInMB: dataAmountToMB(offer.data_size),
+            price,
+            validity: "30 days",
+            description: `DataFraternity package ${offer.provider_package_id}`,
+            providerPackageId: offer.provider_package_id,
+            sortOrder: index + 1
+          },
+          update: {
+            dataAmount: offer.data_size,
+            dataInMB: dataAmountToMB(offer.data_size),
+            description: `DataFraternity package ${offer.provider_package_id}`,
+            providerPackageId: offer.provider_package_id,
+            sortOrder: index + 1
+          }
+        });
+        plansAdded++;
+      }
+    }
+    return { ok: true, networksAdded, plansAdded };
+  } catch (error) {
+    return { ok: false, networksAdded: 0, plansAdded: 0, error: error instanceof Error ? error.message : "Unknown error" };
+  }
 }
 
 function resolveGhBundleEndpoint(path: string | undefined, fallback: string): string {
@@ -810,6 +949,7 @@ function extractProviderMessage(payload: unknown): string | null {
     root.error,
     toObject(root.data)?.message,
     toObject(root.data)?.msg,
+    toObject(root.data)?.failure_reason,
     toObject(root.order)?.message
   ];
   for (const candidate of messageCandidates) {
@@ -971,8 +1111,14 @@ function normalizeV1Key(value: string): string {
   return value.replace(/[^a-z0-9]/gi, "").toUpperCase();
 }
 
-function resolveV1Network(rawNetworkName?: string | null): { name: V1NetworkName; apiId: number } {
+function resolveV1Network(
+  rawNetworkName?: string | null,
+  dataPlan?: { name?: string | null; dataAmount?: string | null; description?: string | null } | null
+): { name: V1NetworkName; apiId: number } {
   const normalized = normalizeV1Key(rawNetworkName ?? "");
+  const planHints = [dataPlan?.name, dataPlan?.dataAmount, dataPlan?.description]
+    .map((value) => normalizeV1Key(value ?? ""))
+    .filter((value) => value.length > 0);
   const aliasMap: Record<string, V1NetworkName> = {
     MTN: "MTN",
     TELECEL: "TELECEL",
@@ -986,6 +1132,22 @@ function resolveV1Network(rawNetworkName?: string | null): { name: V1NetworkName
   };
 
   let resolvedName = aliasMap[normalized];
+  const hasAirtelTigoHint =
+    normalized.includes("AIRTEL") ||
+    normalized.includes("TIGO") ||
+    normalized.includes("AIRTELTIGO") ||
+    normalized === "AT";
+
+  if (hasAirtelTigoHint) {
+    const hasIsharePlan = planHints.some((value) => value.includes("ISHARE") || value.includes("ATISHARE"));
+    const hasBigTimePlan = planHints.some((value) => value.includes("BIGTIME") || value.includes("ATBIGTIME"));
+    if (hasIsharePlan) {
+      resolvedName = "ISHARE";
+    } else if (hasBigTimePlan) {
+      resolvedName = "BIGTIME";
+    }
+  }
+
   if (!resolvedName && normalized.includes("VODAFONE")) resolvedName = "TELECEL";
   if (!resolvedName && normalized.includes("TELECEL")) resolvedName = "TELECEL";
   if (!resolvedName && (normalized.includes("AIRTEL") || normalized.includes("TIGO") || normalized.includes("BIGTIME"))) {
@@ -1751,6 +1913,24 @@ async function fetchProviderOrderStatusPayload(
     }
   }
 
+  if (isDataFraternityProvider(config)) {
+    if (!providerReference) return null;
+    const statusPath = buildStatusPath(
+      resolveDataFraternityEndpoint(endpoints.status, DATAFRATERNITY_ENDPOINT_DEFAULTS.status),
+      { reference: providerReference, orderId: order.id, orderNumber: order.orderNumber }
+    );
+    try {
+      return await apiRequest<unknown>(config.baseUrl, statusPath, {
+        method: "GET",
+        apiKey: config.apiKey,
+        apiSecret: config.apiSecret ?? undefined
+      });
+    } catch (error) {
+      console.warn("[provider status] DataFraternity status lookup failed:", statusPath, error);
+      return null;
+    }
+  }
+
   if (endpoints.status) {
     const statusTemplate = isGhBundle
       ? resolveGhBundleEndpoint(endpoints.status, "/orders/{reference}")
@@ -1952,7 +2132,8 @@ async function syncOrderStatusInternal(orderId: string): Promise<{ ok: boolean; 
       orderNumber: true,
       paymentReference: true,
       apiRequestPayload: true,
-      apiResponsePayload: true
+      apiResponsePayload: true,
+      providerDispatchProvider: true
     }
   });
 
@@ -1964,6 +2145,27 @@ async function syncOrderStatusInternal(orderId: string): Promise<{ ok: boolean; 
     return { ok: true, status: order.status };
   }
 
+  if (
+    order.status === "PENDING" &&
+    (order.paymentReference != null ||
+      (order.apiResponsePayload != null &&
+        typeof order.apiResponsePayload === "object" &&
+        Object.keys(order.apiResponsePayload as Record<string, unknown>).length > 0))
+  ) {
+    await prisma.order.updateMany({
+      where: {
+        id: order.id,
+        status: { in: ["PENDING", "FAILED"] }
+      },
+      data: {
+        status: "PROCESSING",
+        paymentStatus: "COMPLETED",
+        failedReason: null
+      }
+    });
+    return { ok: true, status: "PROCESSING" };
+  }
+
   if (order.status !== "PROCESSING") {
     return { ok: true, status: order.status };
   }
@@ -1971,6 +2173,12 @@ async function syncOrderStatusInternal(orderId: string): Promise<{ ok: boolean; 
   const config = await getActiveConfig();
   if (!config) {
     return { ok: false, status: order.status, error: "No API configuration found." };
+  }
+
+  // Historic or other-provider orders are never polled against the currently
+  // active provider. Only a successfully claimed dispatch can be status-synced.
+  if (order.providerDispatchProvider !== config.provider) {
+    return { ok: true, status: order.status };
   }
 
   const statusPayload = await fetchProviderOrderStatusPayload(config, {
@@ -2028,8 +2236,8 @@ export const dataProviderService = {
       return { ok: false, networks: [], error: "API configuration not found." };
     }
 
-    if (isJaybartProvider(config)) {
-      try {
+  if (isJaybartProvider(config)) {
+    try {
         const [providerNetworks, providerPackages] = await Promise.all([
           fetchJaybartNetworks(config),
           fetchJaybartPackages(config)
@@ -2072,10 +2280,34 @@ export const dataProviderService = {
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
         return { ok: false, networks: [], error: msg };
-      }
     }
+  }
 
-    if (isV1Provider(config)) {
+  if (isDataFraternityProvider(config)) {
+    try {
+      const offers = await fetchDataFraternityOffers(config);
+      const grouped = new Map<string, PreviewNetwork>();
+      for (const offer of offers) {
+        if (offer.status !== "IN_STOCK" || offer.provider_status !== "AVAILABLE") continue;
+        if (!grouped.has(offer.network)) {
+          grouped.set(offer.network, {
+            name: offer.network,
+            displayName: offer.network === "ISHARE" ? "iShare" : offer.network === "BIGTIME" ? "BigTime" : offer.network === "TELECEL" ? "Telecel" : offer.network,
+            plans: []
+          });
+        }
+        const price = Number(offer.price);
+        if (Number.isFinite(price) && price > 0) {
+          grouped.get(offer.network)!.plans.push({ name: offer.name, dataAmount: offer.data_size, price, validity: "30 days" });
+        }
+      }
+      return { ok: true, networks: Array.from(grouped.values()) };
+    } catch (error) {
+      return { ok: false, networks: [], error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
+  if (isV1Provider(config)) {
       return {
         ok: true,
         networks: V1_NETWORKS.map((n) => ({
@@ -2340,6 +2572,10 @@ export const dataProviderService = {
       return syncJaybartNetworksAndPlans(config, options);
     }
 
+    if (isDataFraternityProvider(config)) {
+      return syncDataFraternityNetworksAndPlans(config, options);
+    }
+
     if (isV1Provider(config)) {
       return syncV1NetworksAndPlans(config, options);
     }
@@ -2514,7 +2750,10 @@ export const dataProviderService = {
     }
   },
 
-  async fulfillOrder(orderId: string): Promise<{ ok: boolean; reference?: string; error?: string; status?: string }> {
+  async fulfillOrder(
+    orderId: string,
+    options: { manual?: boolean } = {}
+  ): Promise<{ ok: boolean; reference?: string; error?: string; status?: string }> {
     console.log("[fulfillOrder] Starting for order:", orderId);
 
     const order = await prisma.order.findUnique({
@@ -2537,6 +2776,33 @@ export const dataProviderService = {
     if (order.paymentStatus !== "COMPLETED" && order.paymentMethod !== "WALLET") {
       console.log("[fulfillOrder] Payment not completed yet, skipping provider call:", orderId);
       return { ok: true, status: order.status };
+    }
+
+    // Orders received while the provider was disabled deliberately remain pending.
+    // They can only leave the queue through the admin's explicit resend action.
+    if (!options.manual && !order.autoFulfillmentEligible) {
+      console.log("[fulfillOrder] Automatic dispatch blocked for previously queued order:", orderId);
+      return { ok: true, status: order.status };
+    }
+
+    // If this order already has provider submission data, keep it in PROCESSING
+    // so admin and sync flows do not treat it as just queued/pending.
+    if (
+      order.status === "PENDING" &&
+      (order.paymentReference != null ||
+        (order.apiResponsePayload != null &&
+          typeof order.apiResponsePayload === "object" &&
+          Object.keys(order.apiResponsePayload as Record<string, unknown>).length > 0))
+    ) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          status: "PROCESSING",
+          paymentStatus: "COMPLETED",
+          failedReason: null
+        }
+      });
+      return { ok: true, status: "PROCESSING", reference: order.paymentReference ?? undefined };
     }
 
     const blockingOrder = await findBlockingSerializedOrder(orderId);
@@ -2564,12 +2830,24 @@ export const dataProviderService = {
     const config = await getActiveConfig();
     if (!config) {
       console.error("[fulfillOrder] No active API config found");
+      if (!options.manual) {
+        await prisma.order.updateMany({
+          where: { id: orderId, providerDispatchStartedAt: null },
+          data: { autoFulfillmentEligible: false }
+        });
+      }
       return { ok: false, error: "No API configuration. Configure in Settings > API Configuration." };
     }
 
     // Validate API credentials
     if (!config.apiKey || !config.apiKey.trim()) {
       console.error("[fulfillOrder] API key is missing or empty");
+      if (!options.manual) {
+        await prisma.order.updateMany({
+          where: { id: orderId, providerDispatchStartedAt: null },
+          data: { autoFulfillmentEligible: false }
+        });
+      }
       return { ok: false, error: "API key is missing. Check your API configuration." };
     }
 
@@ -2580,16 +2858,21 @@ export const dataProviderService = {
     // Detect GhBundle API (direct or proxy URLs)
     const isGhBundle = isGhBundleBaseUrl(config.baseUrl);
     const isJaybart = isJaybartProvider(config);
+    const isDataFraternity = isDataFraternityProvider(config);
     const isV1 = isV1Provider(config);
     const purchasePaths = isGhBundle
       ? [resolveGhBundleEndpoint(endpoints.purchase, "/orders")]
       : isJaybart
         ? [resolveJaybartEndpoint(endpoints.purchase, JAYBART_ENDPOINT_DEFAULTS.purchase)]
+      : isDataFraternity
+        ? [resolveDataFraternityEndpoint(endpoints.purchase, DATAFRATERNITY_ENDPOINT_DEFAULTS.purchase)]
       : isV1
         ? getV1PurchaseCandidatePaths(endpoints)
         : [endpoints.purchase ?? "/api/purchase"];
     const purchaseMethod = isJaybart
       ? JAYBART_ENDPOINT_DEFAULTS.purchaseMethod
+      : isDataFraternity
+        ? DATAFRATERNITY_ENDPOINT_DEFAULTS.purchaseMethod
       : endpoints.purchaseMethod ?? "POST"; // Default to POST, but allow GET
 
     let payload: object;
@@ -2676,8 +2959,25 @@ export const dataProviderService = {
         resolvedNetwork: resolvedNetwork.name,
         providerNetworkName: resolvedNetwork.providerName
       }));
+    } else if (isDataFraternity) {
+      const packageId = order.dataPlan?.providerPackageId ?? order.dataPlan?.description?.match(/DataFraternity package\s+([^\s]+)/i)?.[1];
+      if (!packageId) {
+        return {
+          ok: false,
+          error: "This plan is not linked to a DataFraternity package. Sync services in Settings > API Configuration before taking orders."
+        };
+      }
+      payload = {
+        package_id: packageId,
+        phone_number: toLocalGhanaPhone(order.recipientNumber)
+      };
+      console.log("[fulfillOrder] DataFraternity payload:", JSON.stringify(payload));
     } else if (isV1) {
-      const resolvedNetwork = resolveV1Network(order.network?.name);
+      const resolvedNetwork = resolveV1Network(order.network?.name, {
+        name: order.dataPlan?.name,
+        dataAmount: order.dataPlan?.dataAmount,
+        description: order.dataPlan?.description
+      });
       const size = resolveV1PlanSize(resolvedNetwork.name, {
         name: order.dataPlan?.name,
         dataAmount: order.dataPlan?.dataAmount
@@ -2719,6 +3019,29 @@ export const dataProviderService = {
     console.log("[fulfillOrder] Calling provider API candidates:", purchasePaths.map((path) => `${config.baseUrl}${path}`), "Method:", purchaseMethod);
 
     try {
+      // Atomically claim immediately before the first outbound HTTP call. Concurrent
+      // callbacks or admin clicks cannot pass this claim more than once.
+      const dispatchClaim = await prisma.order.updateMany({
+        where: {
+          id: orderId,
+          providerDispatchStartedAt: null,
+          status: { in: ["PENDING", "PROCESSING", "FAILED"] }
+        },
+        data: {
+        providerDispatchStartedAt: new Date(),
+        providerDispatchProvider: config.provider,
+        autoFulfillmentEligible: false
+        }
+      });
+      if (dispatchClaim.count !== 1) {
+        console.warn("[fulfillOrder] Dispatch already claimed; refusing duplicate provider request:", orderId);
+        return {
+          ok: false,
+          status: order.status,
+          error: "This order has already been sent to the provider or is currently being sent."
+        };
+      }
+
       const sendPurchaseRequest = async (activePath: string, activePayload: object): Promise<{
         message?: string;
         order?: { reference_id?: number; total?: string; status?: string };

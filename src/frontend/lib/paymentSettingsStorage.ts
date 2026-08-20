@@ -19,8 +19,7 @@ export type PaymentSettings = {
   moolre: MoolreSettings;
 };
 
-const STORAGE_KEY = "bundlearena:paymentSettings";
-const LEGACY_STORAGE_KEY = `${["kel", "data", "gh"].join("")}:paymentSettings`;
+const STORAGE_KEY = "vickydata:paymentSettings";
 
 const defaultSettings: PaymentSettings = {
   paystack: {
@@ -42,12 +41,10 @@ const defaultSettings: PaymentSettings = {
 export const loadPaymentSettings = (): PaymentSettings => {
   if (typeof window === "undefined") return defaultSettings;
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  const legacyRaw = raw ? null : window.localStorage.getItem(LEGACY_STORAGE_KEY);
-  const source = raw ?? legacyRaw;
-  if (!source) return defaultSettings;
+  if (!raw) return defaultSettings;
   try {
-    const parsed = JSON.parse(source) as Partial<PaymentSettings>;
-    const next = {
+    const parsed = JSON.parse(raw) as Partial<PaymentSettings>;
+    return {
       paystack: {
         ...defaultSettings.paystack,
         ...parsed.paystack
@@ -57,13 +54,8 @@ export const loadPaymentSettings = (): PaymentSettings => {
         ...parsed.moolre
       },
     };
-    if (legacyRaw) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
-    }
-    return next;
   } catch {
-    window.localStorage.removeItem(raw ? STORAGE_KEY : LEGACY_STORAGE_KEY);
+    window.localStorage.removeItem(STORAGE_KEY);
     return defaultSettings;
   }
 };
@@ -71,5 +63,4 @@ export const loadPaymentSettings = (): PaymentSettings => {
 export const savePaymentSettings = (settings: PaymentSettings) => {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  window.localStorage.removeItem(LEGACY_STORAGE_KEY);
 };

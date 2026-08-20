@@ -2,7 +2,7 @@ const DEFAULT_APP_URL =
   process.env.APP_URL?.trim() ||
   process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
   process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-  "https://bundlearena.com";
+  "https://vickydata.com";
 
 function isLocalhostUrl(value: string): boolean {
   try {

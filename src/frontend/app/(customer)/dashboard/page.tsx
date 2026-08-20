@@ -25,7 +25,8 @@ const getOrderDisplayStatus = (order: { status: string; failedReason?: string | 
   if (order.status === "COMPLETED") return "Completed";
   if (order.status === "PROCESSING") return "In Progress";
   if (order.status === "PENDING") return "Pending";
-  return "Failed";
+  if (order.status === "CANCELLED") return "Cancelled";
+  return "Cancelled";
 };
 
 export default function CustomerDashboardPage() {
@@ -552,7 +553,7 @@ export default function CustomerDashboardPage() {
           <div>
             <h1 className="text-2xl font-black text-slate-900">Customer Rewards</h1>
             <p className="text-sm text-slate-500">
-              Track and manage your BundleArena earnings
+              Track and manage your VickyData earnings
             </p>
           </div>
           <div className="flex items-center gap-3">

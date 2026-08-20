@@ -54,6 +54,18 @@ const getOrderCustomerName = (order: { user?: { fullName?: string | null; userna
   return phoneNumber || "Customer";
 };
 
+const formatOrderDate = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const formatOrderTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+};
+
 export default function Page() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
@@ -360,6 +372,9 @@ export default function Page() {
                       <p className="text-sm font-semibold text-slate-900" title={order.orderNumber}>
                         #{shortOrderId(order.orderNumber)}
                       </p>
+                      <p className="text-[11px] text-slate-400">
+                        {formatOrderDate(order.createdAt)} at {formatOrderTime(order.createdAt)}
+                      </p>
                       <p className="text-xs text-slate-500">
                         {order.user ? (
                           <button
@@ -546,6 +561,12 @@ export default function Page() {
                     <tr key={order.id} className="border-t border-slate-100">
                       <td className="px-4 py-4 font-semibold text-slate-700" title={order.orderNumber}>
                         <span className="block truncate">#{shortOrderId(order.orderNumber)}</span>
+                        <span className="block text-xs font-normal text-slate-400">
+                          {formatOrderDate(order.createdAt)}
+                        </span>
+                        <span className="block text-xs font-normal text-slate-400">
+                          {formatOrderTime(order.createdAt)}
+                        </span>
                       </td>
                       <td className="px-4 py-4 text-slate-600">
                         {order.user ? (

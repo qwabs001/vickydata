@@ -23,7 +23,9 @@ export function useWallet() {
     }
     setLoading(true);
     try {
-      const response = await fetch(`/api/wallet/balance?userId=${user.id}`);
+      const response = await fetch(`/api/wallet/balance?userId=${user.id}`, {
+        cache: "no-store"
+      });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
         setLoading(false);

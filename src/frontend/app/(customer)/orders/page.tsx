@@ -12,13 +12,13 @@ import {
 import { formatCurrency } from "@/shared/utils/formatters";
 import type { OrderSummary } from "@/shared/types";
 
-const statusOptions = ["All Status", "Completed", "In Progress", "Pending", "Failed"] as const;
+const statusOptions = ["All Status", "Completed", "In Progress", "Pending", "Cancelled"] as const;
 
 const statusBadgeStyles: Record<string, string> = {
   Completed: "bg-[#ecfdf3] text-[#16a34a]",
   "In Progress": "bg-[#fff6dd] text-[#f59e0b]",
   Pending: "bg-slate-100 text-slate-600",
-  Failed: "bg-[#fee2e2] text-[#ef4444]"
+  Cancelled: "bg-[#fee2e2] text-[#ef4444]"
 };
 
 const statusMap: Record<string, string> = {
@@ -26,7 +26,7 @@ const statusMap: Record<string, string> = {
   PROCESSING: "In Progress",
   PENDING: "Pending",
   FAILED: "Pending",
-  CANCELLED: "Failed"
+  CANCELLED: "Cancelled"
 };
 
 const formatDate = (value: string) => {
@@ -51,7 +51,7 @@ const formatTime = (value: string) => {
 const getStatusLabel = (status: string) => statusMap[status] ?? status;
 const getDisplayStatus = (order: OrderSummary) => {
   if (order.status === "CANCELLED") {
-    return "Failed";
+    return "Cancelled";
   }
   if (order.status === "FAILED") {
     return "Pending";
@@ -121,7 +121,7 @@ export default function CustomerOrdersPage() {
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `bundlearena-${order.orderNumber}.pdf`;
+      anchor.download = `vickydata-${order.orderNumber}.pdf`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();

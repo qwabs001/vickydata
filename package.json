@@ -1,10 +1,14 @@
 {
-  "name": "bundlearena",
+  "name": "vickydata",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && next build --webpack && sh scripts/prepare-cpanel-deploy.sh",
+    "deploy:cpanel": "npm run build",
     "start": "next start",
     "lint": "next lint",
     "test:reseller": "tsx --test tests/reseller/**/*.test.ts",

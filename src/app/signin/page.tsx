@@ -4,7 +4,7 @@ import SignInPageClient from "@/frontend/app/signin/page";
 
 export const metadata: Metadata = {
   title: "Sign In",
-  description: "Sign in to BundleArena to buy data, manage orders, and track rewards.",
+  description: "Sign in to VickyData to buy data, manage orders, and track rewards.",
   alternates: { canonical: "/signin" }
 };
 

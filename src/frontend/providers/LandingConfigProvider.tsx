@@ -19,8 +19,7 @@ interface LandingConfigContextValue {
 }
 
 const LandingConfigContext = createContext<LandingConfigContextValue | undefined>(undefined);
-const STORAGE_KEY = "bundlearena.landing.config";
-const LEGACY_STORAGE_KEY = `${["kel", "data", "gh"].join("")}.landing.config`;
+const STORAGE_KEY = "vickydata.landing.config";
 
 export function LandingConfigProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<LandingConfig>(defaultLandingConfig);
@@ -29,7 +28,7 @@ export function LandingConfigProvider({ children }: { children: React.ReactNode 
     if (typeof window === "undefined") return;
     let active = true;
     const readLocalStorage = () => {
-      const stored = window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY);
+      const stored = window.localStorage.getItem(STORAGE_KEY);
       if (!stored) return;
       try {
         const parsed = JSON.parse(stored) as LandingConfig;
@@ -37,10 +36,8 @@ export function LandingConfigProvider({ children }: { children: React.ReactNode 
         const merged = mergeLandingConfig(parsed);
         setConfig(merged);
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-        window.localStorage.removeItem(LEGACY_STORAGE_KEY);
       } catch {
         window.localStorage.removeItem(STORAGE_KEY);
-        window.localStorage.removeItem(LEGACY_STORAGE_KEY);
       }
     };
 
@@ -56,7 +53,6 @@ export function LandingConfigProvider({ children }: { children: React.ReactNode 
         const merged = mergeLandingConfig(data);
         setConfig(merged);
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-        window.localStorage.removeItem(LEGACY_STORAGE_KEY);
       } catch {
         readLocalStorage();
       }
@@ -72,7 +68,6 @@ export function LandingConfigProvider({ children }: { children: React.ReactNode 
     setConfig(next);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     }
   }, []);
 

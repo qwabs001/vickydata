@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/backend/lib/db/prisma";
 
+const getCustomerVisibleStatus = (status: string) => {
+  if (status === "FAILED") return "PENDING";
+  return status;
+};
+
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
@@ -42,7 +47,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       order: {
         id: order.id,
         orderNumber: order.orderNumber,
-        status: order.status,
+        status: getCustomerVisibleStatus(order.status),
         paymentStatus: order.paymentStatus,
         amount: order.amount,
         currency: order.currency,

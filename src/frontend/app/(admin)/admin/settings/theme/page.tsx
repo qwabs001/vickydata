@@ -31,7 +31,7 @@ type ContactSettings = {
 };
 
 const defaultFooter: FooterSettings = {
-  copyright: `© ${new Date().getFullYear()} BundleArena. All rights reserved.`,
+  copyright: `© ${new Date().getFullYear()} VickyData. All rights reserved.`,
   showLogo: true,
   privacyUrl: "",
   termsUrl: "",
@@ -537,7 +537,7 @@ export default function Page() {
                   <input
                     value={contact.email}
                     onChange={(e) => setContact((prev) => ({ ...prev, email: e.target.value }))}
-                    placeholder="support@bundlearena.com"
+                    placeholder="support@vickydata.com"
                     className="mt-2 w-full rounded-xl border border-slate-200 bg-[#f8fafc] px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
                   />
                 </div>
@@ -706,7 +706,7 @@ export default function Page() {
             <input
               value={footer.copyright}
               onChange={(e) => setFooter((prev) => ({ ...prev, copyright: e.target.value }))}
-              placeholder={`© ${new Date().getFullYear()} BundleArena. All rights reserved.`}
+              placeholder={`© ${new Date().getFullYear()} VickyData. All rights reserved.`}
               className="mt-2 w-full rounded-xl border border-slate-200 bg-[#f8fafc] px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
             />
           </div>

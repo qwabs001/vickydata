@@ -9,7 +9,7 @@ export function WelcomeSection() {
         Instant Delivery
       </div>
       <h1 className="text-5xl font-black leading-[1.1] tracking-tight text-[#0d131c] md:text-6xl">
-        WELCOME TO <span className="text-primary">BUNDLEARENA</span>
+        WELCOME TO <span className="text-primary">VICKYDATA</span>
       </h1>
       <p className="text-lg font-medium text-gray-600">
         The fastest way to top up your mobile data in Ghana. Secure, instant, and reliable.

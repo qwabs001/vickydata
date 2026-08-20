@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
-            folder: "bundlearena/networks",
+            folder: "vickydata/networks",
             resource_type: "image",
             overwrite: true
           },

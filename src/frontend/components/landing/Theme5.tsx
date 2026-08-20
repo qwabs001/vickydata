@@ -93,7 +93,7 @@ const getSmmIcon = (id: string, title: string) => {
   if (source.includes("instagram")) return "/images/networks/Instagram_icon.png.webp";
   if (source.includes("youtube")) return "/images/networks/youtube-logo.png";
   if (source.includes("facebook")) return "/images/networks/Facebook_Logo_(2019).png";
-  return "/images/brand/bundlearena-icon.png";
+  return "/images/brand/vickydata-icon.png";
 };
 
 const Theme5: React.FC = () => {
@@ -141,7 +141,7 @@ const Theme5: React.FC = () => {
   const sectionAccent = primary || "#4f6df5";
   const smmAccent = "#18b7a1";
   const deepSurfaceColor = "#0F172B";
-  const brandName = "BundleArena";
+  const brandName = "VickyData";
 
   const primaryRgb = useMemo(() => {
     const fallback = { r: 245, g: 198, b: 61 };
@@ -1209,7 +1209,7 @@ const Theme5: React.FC = () => {
       </main>
 
       <footer className="border-t border-[#e8e2d7] bg-[#f8f6f3] py-4 text-center text-xs text-[#887f72] md:py-3">
-        copyright 2026 - BundleArena
+        copyright 2026 - VickyData
       </footer>
 
       <div

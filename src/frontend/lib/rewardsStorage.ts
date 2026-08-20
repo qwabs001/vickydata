@@ -4,8 +4,7 @@ export type RewardsState = {
   transactions: RewardsTransaction[];
 };
 
-const STORAGE_KEY = "bundlearena.rewards.state";
-const LEGACY_STORAGE_KEY = `${["kel", "data", "gh"].join("")}.rewards.state`;
+const STORAGE_KEY = "vickydata.rewards.state";
 
 const seedTransactions: RewardsTransaction[] = [
   {
@@ -55,23 +54,17 @@ export const loadRewardsState = (): RewardsState => {
     return { transactions: seedTransactions };
   }
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  const legacyRaw = raw ? null : window.localStorage.getItem(LEGACY_STORAGE_KEY);
-  const source = raw ?? legacyRaw;
-  if (!source) {
+  if (!raw) {
     return { transactions: seedTransactions };
   }
   try {
-    const parsed = JSON.parse(source) as RewardsState;
+    const parsed = JSON.parse(raw) as RewardsState;
     if (!parsed.transactions?.length) {
       return { transactions: seedTransactions };
     }
-    if (legacyRaw) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
-    }
     return parsed;
   } catch {
-    window.localStorage.removeItem(raw ? STORAGE_KEY : LEGACY_STORAGE_KEY);
+    window.localStorage.removeItem(STORAGE_KEY);
     return { transactions: seedTransactions };
   }
 };
@@ -79,5 +72,4 @@ export const loadRewardsState = (): RewardsState => {
 export const saveRewardsState = (state: RewardsState) => {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  window.localStorage.removeItem(LEGACY_STORAGE_KEY);
 };

@@ -181,7 +181,7 @@ export async function POST(
       }
       // Remove payment status check - allow admin to resend regardless of payment status
       try {
-        const result = await dataProviderService.fulfillOrder(order.id);
+        const result = await dataProviderService.fulfillOrder(order.id, { manual: true });
         if (result.ok) {
           return NextResponse.json({ ok: true, reference: result.reference });
         }

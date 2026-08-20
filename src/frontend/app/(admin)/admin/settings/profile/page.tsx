@@ -140,7 +140,7 @@ export default function AdminProfileSettingsPage() {
                 className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 outline-none focus:border-[#2563eb]"
                 value={form.email}
                 onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-                placeholder="admin@bundlearena.com"
+                placeholder="admin@vickydata.com"
               />
             </label>
             <label className="text-xs font-semibold text-slate-500">

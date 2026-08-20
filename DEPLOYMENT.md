@@ -1,4 +1,4 @@
-# BundleArena Production Deployment (bundlearena.com)
+# VickyData Production Deployment (vickydata.com)
 
 ## Quick deploy (Vercel / auto-deploy)
 
@@ -23,11 +23,11 @@ DATABASE_URL="postgresql://postgres.xxx:password@aws-0-xx-x.pooler.supabase.com:
 
 # NextAuth (required for auth)
 NEXTAUTH_SECRET="<run: openssl rand -base64 32>"
-NEXTAUTH_URL="https://bundlearena.com"
+NEXTAUTH_URL="https://vickydata.com"
 
 # App
-NEXT_PUBLIC_APP_URL="https://bundlearena.com"
-NEXT_PUBLIC_APP_NAME="BundleArena"
+NEXT_PUBLIC_APP_URL="https://vickydata.com"
+NEXT_PUBLIC_APP_NAME="VickyData"
 NODE_ENV="production"
 
 # Payments (optional – can be set in Admin → Payment Settings instead)
@@ -71,11 +71,11 @@ npm start
 
 ## Post-deploy checklist
 
-- [ ] `NEXTAUTH_URL` points to `https://bundlearena.com`
+- [ ] `NEXTAUTH_URL` points to `https://vickydata.com`
 - [ ] `NEXTAUTH_SECRET` is set and kept secret
 - [ ] `DATABASE_URL` is valid and reachable
-- [ ] Moolre: credentials in Admin → Payment Settings; callback URL in Moolre dashboard: `https://bundlearena.com/api/payments/moolre/callback`
-- [ ] Paystack webhook URL (legacy optional): `https://bundlearena.com/api/webhooks/paystack`
+- [ ] Moolre: credentials in Admin → Payment Settings; callback URL in Moolre dashboard: `https://vickydata.com/api/payments/moolre/callback`
+- [ ] Paystack webhook URL (legacy optional): `https://vickydata.com/api/webhooks/paystack`
 
 ## Reseller API proxy (when agent IPs are blocked)
 
@@ -89,4 +89,4 @@ If agents get **403 Forbidden (cpt1::…)** because their server IP is blocked b
    ```
 2. Share the Worker URL with affected agents:  
    `https://<worker-name>.<subdomain>.workers.dev/api/v1`
-3. Agents use that as base URL instead of `https://bundlearena.com/api/v1`. Same auth, same endpoints.
+3. Agents use that as base URL instead of `https://vickydata.com/api/v1`. Same auth, same endpoints.

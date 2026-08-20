@@ -60,7 +60,26 @@ function isJaybartUrl(url: string): boolean {
   return /jaybartservices\.com/i.test(url);
 }
 
+function isDataFraternityUrl(url: string): boolean {
+  return /datafraternity\.com/i.test(url);
+}
+
 function getProviderDefaults(baseUrl: string) {
+  if (isDataFraternityUrl(baseUrl)) {
+    return {
+      provider: "datafraternity",
+      name: "DataFraternity API",
+      endpoints: {
+        test: "/wallet",
+        networks: "/special-offers",
+        plans: "/special-offers",
+        purchase: "/special-offers/orders",
+        status: "/special-offers/orders/{reference}",
+        purchaseMethod: "POST" as const
+      }
+    };
+  }
+
   if (isGhBundleUrl(baseUrl)) {
     return {
       provider: "ghbundle",
@@ -156,6 +175,7 @@ export default function Page() {
   const activeConfig = configs.find((c) => c.isActive);
   const ghBundleMode = isGhBundleUrl(baseUrl);
   const jaybartMode = isJaybartUrl(baseUrl);
+  const dataFraternityMode = isDataFraternityUrl(baseUrl);
   const statusLabel = !activeConfig
     ? "Not Connected"
     : serviceStatus?.ok === true
@@ -526,6 +546,9 @@ export default function Page() {
               ) : null}
               {jaybartMode ? (
                 <p className="mt-1 text-xs text-[#2563eb]">Jaybart uses the `x-api-key` header with the raw API key.</p>
+              ) : null}
+              {dataFraternityMode ? (
+                <p className="mt-1 text-xs text-[#2563eb]">DataFraternity uses the raw API key in the `X-API-Key` header.</p>
               ) : null}
             </div>
             <div>

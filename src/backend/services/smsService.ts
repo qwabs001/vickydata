@@ -123,7 +123,7 @@ async function sendViaTermii(
   const url = "https://api.ng.termii.com/api/sms/send";
   const payload = {
     to: to.replace("+", ""),
-    from: config.senderId?.trim() || "BundleArena",
+    from: config.senderId?.trim() || "VickyData",
     sms: message,
     type: "plain",
     channel: "dnd",

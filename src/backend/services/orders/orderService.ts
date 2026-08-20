@@ -12,28 +12,13 @@ async function findBlockingPaidDuplicateOrder(
   params: {
     currentOrderId?: string;
     recipientNumber: string;
-    networkId: string;
-    dataPlanId: string;
   }
 ) {
-  const plan = await tx.dataPlan.findUnique({
-    where: { id: params.dataPlanId },
-    select: { dataInMB: true }
-  });
-
-  if (!plan) return null;
-
   const activeOrders = await tx.order.findMany({
     where: {
       recipientNumber: params.recipientNumber,
-      networkId: params.networkId,
       paymentStatus: "COMPLETED",
-      status: { in: [...ACTIVE_SERIALIZED_ORDER_STATUSES] },
-      dataPlan: {
-        is: {
-          dataInMB: plan.dataInMB
-        }
-      }
+      status: { in: [...ACTIVE_SERIALIZED_ORDER_STATUSES] }
     },
     select: {
       id: true,
@@ -160,9 +145,7 @@ export const orderService = {
 
       const blockingOrder = useWallet
         ? await findBlockingPaidDuplicateOrder(tx, {
-            recipientNumber,
-            networkId: payload.networkId,
-            dataPlanId: payload.dataPlanId
+            recipientNumber
           })
         : null;
       const shouldQueueBehindDuplicate = Boolean(blockingOrder);

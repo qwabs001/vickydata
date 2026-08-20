@@ -1,11 +1,11 @@
-# Vercel Deployment Guide for BundleArena
+# Vercel Deployment Guide for VickyData
 
 ## Quick Start
 
 1. **Connect Repository to Vercel**
    - Go to [Vercel Dashboard](https://vercel.com/dashboard)
    - Click "Add New Project"
-   - Import your GitHub repository: `qwabs001/bundlearena`
+   - Import your GitHub repository: `qwabs001/vickydata`
    - Select branch: `dev001` (or `main`)
 
 2. **Configure Environment Variables** (see below)
@@ -20,7 +20,7 @@
 
 1. Visit [vercel.com](https://vercel.com) and sign in
 2. Click **"Add New Project"**
-3. Import Git Repository → Select **"qwabs001/bundlearena"**
+3. Import Git Repository → Select **"qwabs001/vickydata"**
 4. Configure Project:
    - **Framework Preset:** Next.js (auto-detected)
    - **Root Directory:** `./` (default)
@@ -42,14 +42,14 @@ DIRECT_DATABASE_URL=postgresql://postgres:<DB_PASSWORD>@db.kbzdbwaahfcxutelbmnm.
 
 # NextAuth (REQUIRED - Generate a new secret)
 NEXTAUTH_SECRET=<GENERATE_NEW_SECRET_BELOW>
-NEXTAUTH_URL=https://bundlearena.com
+NEXTAUTH_URL=https://vickydata.com
 
 # App Configuration
-APP_URL=https://bundlearena.com
-APP_NAME=BundleArena
-NEXT_PUBLIC_APP_URL=https://bundlearena.com
-NEXT_PUBLIC_SITE_URL=https://bundlearena.com
-NEXT_PUBLIC_APP_NAME=BundleArena
+APP_URL=https://vickydata.com
+APP_NAME=VickyData
+NEXT_PUBLIC_APP_URL=https://vickydata.com
+NEXT_PUBLIC_SITE_URL=https://vickydata.com
+NEXT_PUBLIC_APP_NAME=VickyData
 NODE_ENV=production
 
 # Supabase
@@ -92,7 +92,7 @@ Copy the output and paste it as `NEXTAUTH_SECRET` in Vercel.
 
 1. Click **"Deploy"** button
 2. Wait for build to complete (2-5 minutes)
-3. Your site will be live at: `https://bundlearena-xxx.vercel.app`
+3. Your site will be live at: `https://vickydata-xxx.vercel.app`
 
 ### Step 5: Run Database Migrations
 
@@ -110,17 +110,17 @@ npx prisma migrate deploy
 ### Step 6: Configure Custom Domain
 
 1. Go to **Settings** → **Domains**
-2. Add your domain: `bundlearena.com`
+2. Add your domain: `vickydata.com`
 3. Follow DNS configuration instructions
 4. Wait for DNS propagation (5-30 minutes)
 
 ## Post-Deployment Checklist
 
 - [ ] Environment variables are set correctly
-- [ ] `NEXTAUTH_URL` matches your domain (`https://bundlearena.com`)
+- [ ] `NEXTAUTH_URL` matches your domain (`https://vickydata.com`)
 - [ ] `NEXTAUTH_SECRET` is set and secure
 - [ ] Database migrations are applied
-- [ ] Custom domain is configured (if using `bundlearena.com`)
+- [ ] Custom domain is configured (if using `vickydata.com`)
 - [ ] Payment provider credentials are set (Admin → Payment Settings)
 - [ ] Test login/signup functionality
 - [ ] Test data bundle purchase flow

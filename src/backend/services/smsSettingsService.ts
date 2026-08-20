@@ -18,7 +18,7 @@ export type SmsSettings = {
   provider: "africastalking" | "termii";
   africastalking: AfricasTalkingSettings;
   termii: TermiiSettings;
-  /** Custom sender name for order complete SMS (e.g. "BundleArena") */
+  /** Custom sender name for order complete SMS (e.g. "VickyData") */
   orderCompleteTemplate: string;
   /** Custom sender name for wallet top-up SMS */
   walletTopUpTemplate: string;
@@ -37,7 +37,7 @@ const defaultSettings: SmsSettings = {
     senderId: ""
   },
   orderCompleteTemplate: "Your order {{orderNumber}} is complete. {{planName}} has been delivered to {{recipient}}.",
-  walletTopUpTemplate: "Your BundleArena wallet has been credited with GHS {{amount}}. New balance: GHS {{balance}}."
+  walletTopUpTemplate: "Your VickyData wallet has been credited with GHS {{amount}}. New balance: GHS {{balance}}."
 };
 
 export async function getSmsSettings(): Promise<SmsSettings> {

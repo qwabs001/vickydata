@@ -161,6 +161,7 @@ model DataPlan {
   currency    String    @default("GHS")
   validity    String?
   description String?
+  providerPackageId String?
   isActive    Boolean   @default(true)
   isFeatured  Boolean   @default(false)
   sortOrder   Int       @default(0)
@@ -190,6 +191,12 @@ model Order {
   recipientNumber    String
   apiRequestPayload  Json?
   apiResponsePayload Json?
+  /// False for orders created while no provider was active; only an admin resend may dispatch them.
+  autoFulfillmentEligible Boolean @default(true)
+  /// Immutable dispatch claim that prevents duplicate outbound provider orders.
+  providerDispatchStartedAt DateTime?
+  /// Provider used for the dispatch; prevents status checks from crossing providers.
+  providerDispatchProvider String?
   failedReason       String?
   processedBy        String?
   completedAt        DateTime?

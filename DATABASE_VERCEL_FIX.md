@@ -37,7 +37,7 @@ Important:
 
 ## Steps in Vercel
 
-1. Open [Vercel Dashboard](https://vercel.com/dashboard) → your **BundleArena** project.
+1. Open [Vercel Dashboard](https://vercel.com/dashboard) → your **VickyData** project.
 2. Go to **Settings** → **Environment Variables**.
 3. Find **`DATABASE_URL`**.
 4. **Edit** (or add it if missing).

@@ -13,14 +13,14 @@
 ### Option 1: Using the Migration Script
 
 ```bash
-cd /Users/qwabsimac/Documents/BundleArena
+cd /Users/qwabs/Documents/vickydata
 ./run-migrations.sh
 ```
 
 ### Option 2: Manual Command
 
 ```bash
-cd /Users/qwabsimac/Documents/BundleArena
+cd /Users/qwabs/Documents/vickydata
 
 export DATABASE_URL="postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require"
 export DIRECT_DATABASE_URL="postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require"
@@ -32,7 +32,7 @@ npx prisma generate
 ### Option 3: Using npm script
 
 ```bash
-cd /Users/qwabsimac/Documents/BundleArena
+cd /Users/qwabs/Documents/vickydata
 
 export DATABASE_URL="postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require"
 export DIRECT_DATABASE_URL="postgresql://postgres:PASSWORD@db.kbzdbwaahfcxutelbmnm.supabase.co:5432/postgres?sslmode=require"

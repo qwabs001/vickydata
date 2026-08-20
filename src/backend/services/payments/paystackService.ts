@@ -1,5 +1,5 @@
 const PAYSTACK_URL = "https://api.paystack.co";
-const FALLBACK_PAYSTACK_EMAIL = "customer@bundlearena.com";
+const FALLBACK_PAYSTACK_EMAIL = "customer@vickydata.com";
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -12,7 +12,7 @@ const resolvePaystackEmail = (value?: string | null) => {
     .replace(/^[._+-]+|[._+-]+$/g, "")
     .slice(0, 64);
 
-  return localPart ? `${localPart}@bundlearena.com` : FALLBACK_PAYSTACK_EMAIL;
+  return localPart ? `${localPart}@vickydata.com` : FALLBACK_PAYSTACK_EMAIL;
 };
 
 export const paystackService = {
