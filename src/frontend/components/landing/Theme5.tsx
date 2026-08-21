@@ -654,7 +654,6 @@ const Theme5: React.FC = () => {
                 </div>
               </div>
             </div>
-            </div>
           </div>
         </section>
 
