@@ -62,7 +62,7 @@ export const authService = {
       const existing = await prisma.user.findFirst({
         where: {
           OR: [
-            { username: { equals: normalizedUsername, mode: "insensitive" } },
+            { username: { equals: normalizedUsername } },
             { phoneNumber: normalizedPhoneNumber }
           ]
         }
@@ -107,8 +107,7 @@ export const authService = {
       let user = await prisma.user.findFirst({
         where: {
           username: {
-            equals: normalizedUsername,
-            mode: "insensitive"
+            equals: normalizedUsername
           }
         }
       });
@@ -139,8 +138,7 @@ export const authService = {
     const user = await prisma.user.findFirst({
       where: {
         username: {
-          equals: normalizedUsername,
-          mode: "insensitive"
+          equals: normalizedUsername
         },
         phoneNumber: normalizedPhoneNumber
       }

@@ -81,8 +81,8 @@ export async function listResellerServices(agentId: string, options: {
       ? {
           network: {
             OR: [
-              { name: { equals: options.network, mode: "insensitive" } },
-              { displayName: { contains: options.network, mode: "insensitive" } }
+              { name: { equals: options.network } },
+              { displayName: { contains: options.network } }
             ]
           }
         }
