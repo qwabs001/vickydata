@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  BadgeCheck,
   Bolt,
   ChevronRight,
   Clock3,
@@ -12,8 +11,6 @@ import {
   Lock,
   Menu,
   Signal,
-  Star,
-  Smartphone,
   X,
 } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
@@ -496,27 +493,6 @@ const Theme5: React.FC = () => {
             linear-gradient(135deg, #ffffff 0%, #f4f7ff 52%, #effaf8 100%);
           box-shadow: 0 26px 70px rgba(23, 49, 92, 0.10);
         }
-        .theme5-orb {
-          position: absolute;
-          border-radius: 999px;
-          filter: blur(1px);
-          pointer-events: none;
-        }
-        .theme5-dot-grid {
-          background-image: radial-gradient(rgba(45, 74, 121, 0.16) 1px, transparent 1px);
-          background-size: 18px 18px;
-        }
-        .theme5-glass-card {
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(246, 250, 255, 0.68) 100%);
-          border: 1px solid rgba(255, 255, 255, 0.94);
-          backdrop-filter: blur(18px);
-          -webkit-backdrop-filter: blur(18px);
-          box-shadow: 0 20px 44px rgba(43, 71, 117, 0.14);
-        }
-        .theme5-wallet-primary {
-          background: linear-gradient(145deg, #10284e 0%, #16416c 58%, #176e67 100%);
-          box-shadow: 0 24px 52px rgba(16, 40, 78, 0.26);
-        }
       `}</style>
 
       <header className="sticky top-0 z-40 border-b border-[#e7edf6] bg-white/80 backdrop-blur-xl">
@@ -632,22 +608,12 @@ const Theme5: React.FC = () => {
 
       <main className="mx-auto w-full max-w-[1180px] px-4 pb-40 pt-7 md:px-6 md:pb-16 md:pt-10">
         <section className="theme5-hero relative overflow-hidden rounded-[34px] border border-white px-5 py-9 sm:px-9 lg:px-12 lg:py-12">
-          <span className="theme5-orb -left-20 top-16 h-48 w-48 bg-[#f8dc74]/35" />
-          <span className="theme5-orb -right-16 bottom-0 h-64 w-64 bg-[#77c8c1]/25" />
-          <span className="theme5-dot-grid absolute right-[-72px] top-[-56px] h-64 w-64 opacity-50" />
           <div className="relative grid gap-10 lg:grid-cols-[1.04fr_0.96fr] lg:items-center">
             <div className="max-w-[620px]">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white bg-white/75 px-3 py-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#276d67] shadow-sm">
-                <BadgeCheck size={15} />
-                Instant data, made simple
-              </div>
-              <h1 className="mt-6 text-[44px] font-extrabold leading-[1.02] tracking-[-0.055em] text-[#10213c] sm:text-[62px] lg:text-[68px]">
+              <h1 className="text-[44px] font-extrabold leading-[1.02] tracking-[-0.055em] text-[#10213c] sm:text-[62px] lg:text-[68px]">
                 Data that moves
                 <span className="block" style={{ color: sectionAccent }}>with your day.</span>
               </h1>
-              <p className="mt-6 max-w-[530px] text-base leading-7 text-[#60708a] sm:text-lg">
-                Choose a network, pick a bundle and stay connected in a few simple taps. Clear prices. Secure payment. No clutter.
-              </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <button
@@ -666,94 +632,25 @@ const Theme5: React.FC = () => {
                   Create an account
                 </button>
               </div>
-
-              <div className="mt-9 grid max-w-[530px] grid-cols-3 gap-3 border-t border-[#dfe8f2] pt-6">
-                <div><p className="text-xl font-extrabold text-[#10213c]">3</p><p className="mt-1 text-xs font-semibold text-[#71819a]">Networks</p></div>
-                <div><p className="text-xl font-extrabold text-[#10213c]">24/7</p><p className="mt-1 text-xs font-semibold text-[#71819a]">Self-service</p></div>
-                <div><p className="text-xl font-extrabold text-[#10213c]">Safe</p><p className="mt-1 text-xs font-semibold text-[#71819a]">Checkout</p></div>
-              </div>
             </div>
 
-            <div className="relative hidden md:block">
-            <div className="relative overflow-visible px-3 py-2 sm:px-4">
-              <div
-                className="absolute right-3 top-[-8px] inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold text-[#5a4e31] shadow-sm"
-                style={{ borderColor: primaryRgba(0.35), backgroundColor: primaryRgba(0.12) }}
-              >
-                <Star size={12} className="fill-current" style={{ color: primaryColor }} />
-                Bonus: +2GB
-              </div>
-
-              <div className="mb-5 flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#7688a2]">Your quick checkout</p>
-                  <p className="mt-1 text-lg font-extrabold text-[#10213c]">Bundle wallet</p>
-                </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#276d67] shadow-sm"><Smartphone size={19} /></div>
-              </div>
-
-              <div className="relative mt-5 min-h-[286px] pb-20">
-                <div className="theme5-wallet-primary relative rounded-[28px] p-6 text-white">
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/68">Selected Bundle</p>
-                  <div className="mt-3 flex items-end justify-between gap-4">
-                    <span className="max-w-[65%] truncate text-[28px] font-extrabold leading-none">{selectedBundleName}</span>
-                    <span className="mb-1 text-lg font-bold">{formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}</span>
+            <div className="flex w-full items-center lg:justify-end">
+              <div className="flex w-full max-w-[500px] items-center justify-between gap-4 rounded-[28px] border border-white bg-white px-5 py-5 shadow-[0_20px_44px_rgba(30,59,106,0.12)] sm:px-7 sm:py-6">
+                <div className="flex min-w-0 items-center gap-4">
+                  <div
+                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full"
+                    style={{ color: primaryColor, backgroundColor: primaryRgba(0.18) }}
+                  >
+                    <Signal size={23} />
                   </div>
-
-                  <div className="mt-8 h-[6px] w-full overflow-hidden rounded-full bg-white/15">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: selectedPlan ? "72%" : "15%", backgroundColor: primaryColor }}
-                    />
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between text-xs font-semibold text-white/68">
-                    <span>Secure checkout ready</span>
-                    <span>{selectedNetworkName}</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold uppercase tracking-[0.13em] text-[#697488]">{selectedNetworkName}</p>
+                    <p className="mt-1 truncate text-lg font-extrabold text-[#162033]">{selectedBundleName}</p>
                   </div>
                 </div>
-
-                <div
-                  className="theme5-glass-card absolute right-0 top-12 w-[168px] rounded-[26px] p-4"
-                  style={{
-                    background:
-                      "linear-gradient(180deg, rgba(231, 236, 246, 0.92) 0%, rgba(187, 195, 214, 0.82) 100%)",
-                  }}
-                >
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#5f6c82]">
-                    Wallet Boost
-                  </p>
-                  <p className="mt-2 text-[28px] font-extrabold leading-none" style={{ color: primaryColor }}>
-                    +2GB
-                  </p>
-                  <p className="mt-2 text-xs leading-5 text-[#5f6c82]">
-                    Bonus applied to eligible orders.
-                  </p>
-                </div>
-
-                <div className="absolute bottom-0 left-6 right-12 flex items-center justify-between gap-4 rounded-[26px] border border-white/80 bg-white px-5 py-4 shadow-[0_18px_36px_rgba(15,23,43,0.1)]">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="flex h-11 w-11 items-center justify-center rounded-full"
-                      style={{ color: primaryColor, backgroundColor: primaryRgba(0.18) }}
-                    >
-                      <Signal size={18} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#697488]">
-                        {selectedNetworkName}
-                      </p>
-                      <p className="text-sm font-bold text-[#162033]">{selectedBundleName}</p>
-                    </div>
-                  </div>
-                    <div className="text-right">
-                    <p className="text-sm font-extrabold text-[#09a54e]">
-                      {formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}
-                    </p>
-                    <p className="text-xs text-[#697488]">
-                      {checkoutState === "success" ? "Success" : "Ready to activate"}
-                    </p>
-                  </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-lg font-extrabold text-[#09a54e]">{formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}</p>
+                  <p className="mt-1 text-sm text-[#697488]">Ready to activate</p>
                 </div>
               </div>
             </div>
