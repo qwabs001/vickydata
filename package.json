@@ -13,13 +13,13 @@
     "lint": "next lint",
     "test:reseller": "tsx --test tests/reseller/**/*.test.ts",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate": "prisma db push",
     "prisma:migrate:supabase": "./run-migrations.sh",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:cleanup": "tsx prisma/cleanup.ts",
     "prisma:normalize-ghbundle": "tsx prisma/normalize-ghbundle-config.ts",
     "prisma:normalize-ghbundle:apply": "tsx prisma/normalize-ghbundle-config.ts --apply",
-    "deploy": "prisma generate && prisma migrate deploy && npm run build"
+    "deploy": "prisma generate && prisma db push && npm run build"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
