@@ -3,10 +3,8 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowRight,
   BadgeCheck,
   Bolt,
-  Check,
   ChevronRight,
   Clock3,
   Headphones,
@@ -23,7 +21,6 @@ import { useNetworks } from "@/frontend/hooks/useNetworks";
 import { useAllDataPlans, useDataPlans } from "@/frontend/hooks/useDataPlans";
 import { useWallet } from "@/frontend/hooks/useWallet";
 import { useTheme } from "@/frontend/providers/ThemeProvider";
-import { useLandingConfig } from "@/frontend/providers/LandingConfigProvider";
 import { formatCurrency, formatGhanaPhone } from "@/shared/utils/formatters";
 import { isValidGhanaPhone } from "@/shared/utils/validators";
 import { getDefaultRouteForRole } from "@/frontend/lib/authRoutes";
@@ -83,22 +80,12 @@ function parsePlanSizeInGb(plan: DataPlan): number | null {
   return Number(match[1]);
 }
 
-const getSmmIcon = (id: string, title: string) => {
-  const source = `${id} ${title}`.toLowerCase();
-  if (source.includes("tiktok")) return "/images/networks/Tiktok_icon.svg.png";
-  if (source.includes("instagram")) return "/images/networks/Instagram_icon.png.webp";
-  if (source.includes("youtube")) return "/images/networks/youtube-logo.png";
-  if (source.includes("facebook")) return "/images/networks/Facebook_Logo_(2019).png";
-  return "/images/brand/vickydata-icon.png";
-};
-
 const Theme5: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isAuthenticated, login } = useAuth();
   const { networks } = useNetworks();
   const { logoUrl, footer: footerSettings, accent, primary } = useTheme();
-  const { config } = useLandingConfig();
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -134,7 +121,6 @@ const Theme5: React.FC = () => {
 
   const primaryColor = accent || primary || "#f5c63d";
   const sectionAccent = primary || "#4f6df5";
-  const smmAccent = "#18b7a1";
   const deepSurfaceColor = "#0F172B";
   const brandName = "VickyData";
 
@@ -1073,105 +1059,6 @@ const Theme5: React.FC = () => {
             )}
           </aside>
         </section>
-
-        {config.popularBundles.enabled ? (
-        <section className="mt-20">
-          <div className="rounded-[34px] border border-[#e8edf4] bg-[#f8fafc] p-5 shadow-[0_18px_40px_rgba(15,23,43,0.04)] sm:p-8">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h2 className="text-[32px] font-extrabold tracking-[-0.03em] text-[#182033] sm:text-[38px]">
-                  {config.popularBundles.title}
-                </h2>
-                <p className="mt-2 text-base text-[#60708a]">
-                  {config.popularBundles.subtitle}
-                </p>
-              </div>
-
-              <a
-                href={config.popularBundles.ctaUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-full border px-5 py-3 text-sm font-bold transition hover:opacity-90"
-                style={{ borderColor: smmAccent, color: smmAccent }}
-              >
-                {config.popularBundles.ctaText}
-                <ArrowRight size={16} />
-              </a>
-            </div>
-
-            <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {config.popularBundles.items.map((service) => (
-                <article
-                  key={service.id}
-                  className="relative rounded-[28px] border bg-white p-5 shadow-[0_12px_28px_rgba(15,23,43,0.04)]"
-                  style={{
-                    borderColor: service.isFeatured ? smmAccent : "#e8edf4",
-                    boxShadow: service.isFeatured
-                      ? "0 18px 40px rgba(24, 183, 161, 0.12)"
-                      : "0 12px 28px rgba(15, 23, 43, 0.04)",
-                  }}
-                >
-                  {service.isFeatured ? (
-                    <span
-                      className="absolute -top-3 right-5 rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.12em] text-white"
-                      style={{ backgroundColor: smmAccent }}
-                    >
-                      Best Value
-                    </span>
-                  ) : null}
-
-                  <div className="flex h-20 w-20 items-center justify-center rounded-[24px] bg-[#f6f9fc] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                    <Image
-                      src={getSmmIcon(service.id, service.title)}
-                      alt={service.title}
-                      width={56}
-                      height={56}
-                      className="h-12 w-12 object-contain"
-                    />
-                  </div>
-
-                  <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.24em] text-[#8b97ab]">
-                    {service.title}
-                  </p>
-                  <p className="mt-4 text-[28px] font-extrabold tracking-[-0.04em]" style={{ color: smmAccent }}>
-                    {service.priceRange}
-                  </p>
-                  <p className="mt-2 min-h-[44px] text-sm leading-6 text-[#60708a]">
-                    {service.description}
-                  </p>
-
-                  <ul className="mt-5 space-y-3">
-                    {service.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-sm text-[#41506a]">
-                        <span
-                          className="flex h-5 w-5 items-center justify-center rounded-full text-white"
-                          style={{ backgroundColor: smmAccent }}
-                        >
-                          <Check size={12} strokeWidth={3} />
-                        </span>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <a
-                    href={config.popularBundles.buyNowUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-8 inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-extrabold text-[#162033] transition hover:opacity-90"
-                    style={{
-                      backgroundColor: service.isFeatured ? smmAccent : "#eef3f8",
-                      color: service.isFeatured ? "#ffffff" : "#233047",
-                    }}
-                  >
-                    {service.ctaLabel}
-                  </a>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-        ) : null}
 
         <section className="mt-20 hidden md:block">
           <div className="rounded-[30px] p-8 text-center sm:p-12" style={{ backgroundColor: primaryColor }}>
