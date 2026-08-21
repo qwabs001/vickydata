@@ -649,11 +649,14 @@ const Theme5: React.FC = () => {
 
         <section id="network-section" className="mt-16 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
           <div>
-            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+            <div className="flex items-center justify-between gap-4 sm:items-end">
               <div>
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ color: sectionAccent }}>01 · Pick your bundle</p>
-                <h2 className="mt-2 text-[38px] font-extrabold leading-[1.04] tracking-[-0.04em] text-[#10213c] sm:text-[46px]">Start with your network.</h2>
-                <p className="mt-3 max-w-[560px] text-[#71819a]">Select a network, add the recipient&apos;s number, then choose a bundle that fits.</p>
+                <p className="text-[13px] font-extrabold uppercase tracking-[0.16em] sm:hidden" style={{ color: sectionAccent }}>1 · Pick your network</p>
+                <div className="hidden sm:block">
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ color: sectionAccent }}>01 · Pick your bundle</p>
+                  <h2 className="mt-2 text-[38px] font-extrabold leading-[1.04] tracking-[-0.04em] text-[#10213c] sm:text-[46px]">Start with your network.</h2>
+                  <p className="mt-3 max-w-[560px] text-[#71819a]">Select a network, add the recipient&apos;s number, then choose a bundle that fits.</p>
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-2 text-xs font-bold text-[#687b96]">
                 <Clock3 size={15} style={{ color: sectionAccent }} />
@@ -661,7 +664,7 @@ const Theme5: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-3 gap-2 md:gap-4">
+            <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-8 md:gap-4">
               {networkCards.map((card) => {
                 const isSelected = selectedNetworkKey === card.key;
                 return (
@@ -725,7 +728,7 @@ const Theme5: React.FC = () => {
             <div className="mt-6 rounded-[28px] border border-[#e2eaf4] bg-white p-4 shadow-[0_20px_44px_rgba(30,59,106,0.06)] sm:p-6">
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#7688a2]">02 · Recipient details</p>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#7688a2]"><span className="sm:hidden">2 · </span><span className="hidden sm:inline">02 · </span>Recipient details</p>
                   <p className="mt-1 text-sm font-bold text-[#10213c]">Who should receive the data?</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#eff5ff]" style={{ color: sectionAccent }}><Headphones size={18} /></div>
