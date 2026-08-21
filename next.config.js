@@ -8,6 +8,12 @@ const nextConfig = {
     // exceeding their per-account memory limit. One worker is slower but stable.
     cpus: 1
   },
+  // The shared cPanel build environment has a very small process-memory limit.
+  // Type checking continues in normal development/CI builds; it is skipped only
+  // when the cPanel deployment command explicitly enables this flag.
+  typescript: {
+    ignoreBuildErrors: process.env.CPANEL_BUILD === "1"
+  },
   turbopack: {
     root: __dirname
   },
