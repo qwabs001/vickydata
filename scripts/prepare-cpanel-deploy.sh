@@ -13,7 +13,7 @@ cp -R public .next/standalone/public
 
 # Prisma engines are loaded dynamically, so Next's standalone file tracing does
 # not always include them. Copy the generated client engines explicitly.
-if [ -d node_modules/.prisma ]; then
+if [ -d node_modules/.prisma ] && [ ! -e .next/standalone/node_modules/.prisma ]; then
   mkdir -p .next/standalone/node_modules/.prisma
   cp -R node_modules/.prisma/. .next/standalone/node_modules/.prisma/
 fi
