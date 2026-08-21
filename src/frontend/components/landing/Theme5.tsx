@@ -4,13 +4,18 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
+  BadgeCheck,
   Bolt,
   Check,
+  ChevronRight,
+  Clock3,
+  Headphones,
   Loader2,
   Lock,
   Menu,
   Signal,
   Star,
+  Smartphone,
   X,
 } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
@@ -78,15 +83,6 @@ function parsePlanSizeInGb(plan: DataPlan): number | null {
   return Number(match[1]);
 }
 
-const HERO_TYPED_LINES = [
-  { text: "Instant,", highlight: false },
-  { text: "Affordable", highlight: false },
-  { text: "Data Bundles", highlight: true },
-  { text: "across Ghana.", highlight: false },
-] as const;
-
-const HERO_TYPED_TOTAL = HERO_TYPED_LINES.reduce((sum, line) => sum + line.text.length, 0);
-
 const getSmmIcon = (id: string, title: string) => {
   const source = `${id} ${title}`.toLowerCase();
   if (source.includes("tiktok")) return "/images/networks/Tiktok_icon.svg.png";
@@ -112,7 +108,6 @@ const Theme5: React.FC = () => {
   const [showAllPlans, setShowAllPlans] = useState(false);
   const [useWalletBalance, setUseWalletBalance] = useState(false);
   const [recipientNumber, setRecipientNumber] = useState("");
-  const [heroTypedCount, setHeroTypedCount] = useState(0);
   const [checkoutState, setCheckoutState] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -192,14 +187,6 @@ const Theme5: React.FC = () => {
     }
   }, [isAuthenticated]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const timeout = window.setTimeout(() => {
-      setHeroTypedCount((current) => (current >= HERO_TYPED_TOTAL ? 0 : current + 1));
-    }, heroTypedCount >= HERO_TYPED_TOTAL ? 1500 : 60);
-    return () => window.clearTimeout(timeout);
-  }, [heroTypedCount]);
-
   const networkCards = useMemo(() => {
     return NETWORK_CARD_CONFIG.map((card) => {
       const matchedNetwork = networks.find((network) => {
@@ -275,26 +262,6 @@ const Theme5: React.FC = () => {
   const walletCanCover = totalCharge > 0 && walletBalance.currentBalance >= totalCharge;
   const walletPayDisabled = useWalletBalance && isAuthenticated && (walletLoading || !walletCanCover);
   const payActionDisabled = !selectedPlan || isSubmitting || walletPayDisabled;
-
-  const typedHeroLines = useMemo(() => {
-    let remaining = heroTypedCount;
-    return HERO_TYPED_LINES.map((line) => {
-      const visibleCount = Math.max(0, Math.min(line.text.length, remaining));
-      remaining = Math.max(0, remaining - line.text.length);
-      return line.text.slice(0, visibleCount);
-    });
-  }, [heroTypedCount]);
-
-  const activeHeroLineIndex = useMemo(() => {
-    let remaining = heroTypedCount;
-    for (let index = 0; index < HERO_TYPED_LINES.length; index += 1) {
-      if (remaining < HERO_TYPED_LINES[index].text.length) {
-        return index;
-      }
-      remaining -= HERO_TYPED_LINES[index].text.length;
-    }
-    return HERO_TYPED_LINES.length - 1;
-  }, [heroTypedCount]);
 
   const payButtonLabel = isSubmitting
     ? useWalletBalance
@@ -532,46 +499,41 @@ const Theme5: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen overflow-x-hidden bg-[#f5f3ef] text-[#1f1a12]"
+      className="min-h-screen overflow-x-hidden bg-[#f7f9fc] text-[#10213c]"
       style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}
     >
       <style>{`
-        .theme5-surface {
-          box-shadow: 0 22px 50px rgba(24, 18, 8, 0.08);
+        .theme5-hero {
+          background:
+            radial-gradient(circle at 7% 8%, ${primaryRgba(0.18)} 0, transparent 26rem),
+            radial-gradient(circle at 92% 12%, rgba(79, 109, 245, 0.15) 0, transparent 25rem),
+            linear-gradient(135deg, #ffffff 0%, #f4f7ff 52%, #effaf8 100%);
+          box-shadow: 0 26px 70px rgba(23, 49, 92, 0.10);
         }
-        .theme5-grid-glow {
-          background-image: radial-gradient(circle at 15% 10%, rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.22), transparent 40%);
+        .theme5-orb {
+          position: absolute;
+          border-radius: 999px;
+          filter: blur(1px);
+          pointer-events: none;
+        }
+        .theme5-dot-grid {
+          background-image: radial-gradient(rgba(45, 74, 121, 0.16) 1px, transparent 1px);
+          background-size: 18px 18px;
         }
         .theme5-glass-card {
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.74) 0%, rgba(255, 255, 255, 0.44) 100%);
-          border: 1px solid rgba(255, 255, 255, 0.72);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(246, 250, 255, 0.68) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.94);
           backdrop-filter: blur(18px);
           -webkit-backdrop-filter: blur(18px);
-          box-shadow: 0 18px 40px rgba(15, 23, 43, 0.14);
+          box-shadow: 0 20px 44px rgba(43, 71, 117, 0.14);
         }
         .theme5-wallet-primary {
-          background: linear-gradient(145deg, #0f172b 0%, #16213f 52%, #203055 100%);
-          box-shadow: 0 20px 46px rgba(15, 23, 43, 0.26);
-        }
-        .theme5-type-caret {
-          display: inline-block;
-          width: 0.12em;
-          height: 0.9em;
-          margin-left: 0.08em;
-          vertical-align: -0.08em;
-          animation: theme5-caret-blink 1s steps(2, start) infinite;
-        }
-        @keyframes theme5-caret-blink {
-          0%, 49% {
-            opacity: 1;
-          }
-          50%, 100% {
-            opacity: 0;
-          }
+          background: linear-gradient(145deg, #10284e 0%, #16416c 58%, #176e67 100%);
+          box-shadow: 0 24px 52px rgba(16, 40, 78, 0.26);
         }
       `}</style>
 
-      <header className="sticky top-0 z-40 border-b border-[#e8e2d8] bg-[#f8f7f4]/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-[#e7edf6] bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex h-[76px] w-full max-w-[1180px] items-center justify-between px-4 md:px-6">
           <button
             type="button"
@@ -579,7 +541,7 @@ const Theme5: React.FC = () => {
             className="flex items-center gap-2"
           >
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[#151208]"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-[#10213c] shadow-sm"
               style={{ backgroundColor: primaryColor }}
             >
               {logoUrl && !logoFailed ? (
@@ -595,16 +557,19 @@ const Theme5: React.FC = () => {
                 <Bolt size={15} className="fill-current" />
               )}
             </span>
-            <span className="text-base font-extrabold tracking-tight text-[#16120a]">{brandName}</span>
+            <span className="text-base font-extrabold tracking-tight text-[#10213c]">{brandName}</span>
           </button>
 
-          <nav className="hidden items-center gap-8 text-sm font-medium text-[#443c30] md:flex">
+          <nav className="hidden items-center gap-7 text-sm font-bold text-[#60708a] md:flex">
             <button
               type="button"
-              className="transition-colors hover:text-[#1b1710]"
+              className="transition-colors hover:text-[#10213c]"
               onClick={() => scrollToNetworkSection()}
             >
-              Network
+              Data bundles
+            </button>
+            <button type="button" className="transition-colors hover:text-[#10213c]" onClick={scrollToNetworkSection}>
+              How it works
             </button>
           </nav>
 
@@ -621,14 +586,14 @@ const Theme5: React.FC = () => {
                   setLoginNotice(null);
                 }
               }}
-              className="rounded-full px-4 py-2 text-sm font-semibold text-[#1a1610] transition-colors hover:bg-[#ebe6dc]"
+              className="rounded-full px-4 py-2 text-sm font-bold text-[#31435f] transition-colors hover:bg-[#eff4fb]"
             >
               {isAuthenticated ? "Dashboard" : "Login"}
             </button>
             <button
               type="button"
               onClick={handleStartNow}
-              className="rounded-full px-5 py-2 text-sm font-extrabold text-[#18140b] shadow-[inset_0_-2px_0_rgba(0,0,0,0.15)]"
+              className="rounded-full px-5 py-2 text-sm font-extrabold text-[#10213c] shadow-[0_8px_18px_rgba(245,198,61,0.28)] transition-transform hover:-translate-y-0.5"
               style={{ backgroundColor: primaryColor }}
             >
               Sign Up
@@ -679,55 +644,51 @@ const Theme5: React.FC = () => {
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-[1180px] px-4 pb-40 pt-8 md:px-6 md:pb-14 md:pt-12">
-        <section className="grid gap-10 lg:grid-cols-2 lg:items-center">
-          <div className="theme5-grid-glow rounded-[28px] p-1">
-            <div className="rounded-[24px] p-4 sm:p-7">
-              <h1
-                aria-label="Instant, Affordable Data Bundles across Ghana."
-                className="text-[42px] font-extrabold leading-[1.04] tracking-[-0.02em] sm:text-[56px]"
-              >
-                {HERO_TYPED_LINES.map((line, index) => (
-                  <span
-                    key={line.text}
-                    className="mb-1 block"
-                  >
-                    <span className="relative inline-block">
-                      <span className="invisible">{line.text}</span>
-                      <span
-                        className="absolute left-0 top-0 whitespace-nowrap"
-                        style={{ color: line.highlight ? primaryColor : "#19140c" }}
-                      >
-                        {typedHeroLines[index]}
-                        {activeHeroLineIndex === index ? (
-                          <span
-                            className="theme5-type-caret"
-                            style={{ backgroundColor: line.highlight ? primaryColor : "#19140c" }}
-                          />
-                        ) : null}
-                      </span>
-                    </span>
-                  </span>
-                ))}
+      <main className="mx-auto w-full max-w-[1180px] px-4 pb-40 pt-7 md:px-6 md:pb-16 md:pt-10">
+        <section className="theme5-hero relative overflow-hidden rounded-[34px] border border-white px-5 py-9 sm:px-9 lg:px-12 lg:py-12">
+          <span className="theme5-orb -left-20 top-16 h-48 w-48 bg-[#f8dc74]/35" />
+          <span className="theme5-orb -right-16 bottom-0 h-64 w-64 bg-[#77c8c1]/25" />
+          <span className="theme5-dot-grid absolute right-[-72px] top-[-56px] h-64 w-64 opacity-50" />
+          <div className="relative grid gap-10 lg:grid-cols-[1.04fr_0.96fr] lg:items-center">
+            <div className="max-w-[620px]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white bg-white/75 px-3 py-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#276d67] shadow-sm">
+                <BadgeCheck size={15} />
+                Instant data, made simple
+              </div>
+              <h1 className="mt-6 text-[44px] font-extrabold leading-[1.02] tracking-[-0.055em] text-[#10213c] sm:text-[62px] lg:text-[68px]">
+                Data that moves
+                <span className="block" style={{ color: sectionAccent }}>with your day.</span>
               </h1>
+              <p className="mt-6 max-w-[530px] text-base leading-7 text-[#60708a] sm:text-lg">
+                Choose a network, pick a bundle and stay connected in a few simple taps. Clear prices. Secure payment. No clutter.
+              </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-8 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    scrollToNetworkSection();
-                  }}
-                  className="rounded-2xl px-6 py-3 text-sm font-extrabold text-[#1a150b] shadow-[inset_0_-2px_0_rgba(0,0,0,0.16)]"
+                  onClick={scrollToNetworkSection}
+                  className="inline-flex items-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-extrabold text-[#10213c] shadow-[0_12px_24px_rgba(245,198,61,0.28)] transition-transform hover:-translate-y-0.5"
                   style={{ backgroundColor: primaryColor }}
                 >
-                  Get Started Now
+                  Buy data now <ChevronRight size={17} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStartNow}
+                  className="rounded-2xl border border-[#d8e2ef] bg-white/75 px-5 py-3.5 text-sm font-extrabold text-[#304561] transition hover:border-[#b7c9df] hover:bg-white"
+                >
+                  Create an account
                 </button>
               </div>
-            </div>
-          </div>
 
-          <div className="relative hidden md:block">
+              <div className="mt-9 grid max-w-[530px] grid-cols-3 gap-3 border-t border-[#dfe8f2] pt-6">
+                <div><p className="text-xl font-extrabold text-[#10213c]">3</p><p className="mt-1 text-xs font-semibold text-[#71819a]">Networks</p></div>
+                <div><p className="text-xl font-extrabold text-[#10213c]">24/7</p><p className="mt-1 text-xs font-semibold text-[#71819a]">Self-service</p></div>
+                <div><p className="text-xl font-extrabold text-[#10213c]">Safe</p><p className="mt-1 text-xs font-semibold text-[#71819a]">Checkout</p></div>
+              </div>
+            </div>
+
+            <div className="relative hidden md:block">
             <div className="relative overflow-visible px-3 py-2 sm:px-4">
               <div
                 className="absolute right-3 top-[-8px] inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold text-[#5a4e31] shadow-sm"
@@ -737,7 +698,13 @@ const Theme5: React.FC = () => {
                 Bonus: +2GB
               </div>
 
-              <p className="text-[17px] font-bold text-[#1c1710]">Bundle Wallet</p>
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#7688a2]">Your quick checkout</p>
+                  <p className="mt-1 text-lg font-extrabold text-[#10213c]">Bundle wallet</p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#276d67] shadow-sm"><Smartphone size={19} /></div>
+              </div>
 
               <div className="relative mt-5 min-h-[286px] pb-20">
                 <div className="theme5-wallet-primary relative rounded-[28px] p-6 text-white">
@@ -804,13 +771,23 @@ const Theme5: React.FC = () => {
                 </div>
               </div>
             </div>
+            </div>
           </div>
         </section>
 
         <section id="network-section" className="mt-16 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
           <div>
-            <h2 className="text-[44px] font-extrabold leading-[1.04] tracking-[-0.02em] text-[#17120b]">Network</h2>
-            <p className="mt-3 text-[#6f6557]">Select a network to load only its assigned data packages.</p>
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ color: sectionAccent }}>01 · Pick your bundle</p>
+                <h2 className="mt-2 text-[38px] font-extrabold leading-[1.04] tracking-[-0.04em] text-[#10213c] sm:text-[46px]">Start with your network.</h2>
+                <p className="mt-3 max-w-[560px] text-[#71819a]">Select a network, add the recipient&apos;s number, then choose a bundle that fits.</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 text-xs font-bold text-[#687b96]">
+                <Clock3 size={15} style={{ color: sectionAccent }} />
+                Usually delivered in minutes
+              </div>
+            </div>
 
             <div className="mt-8 grid grid-cols-3 gap-2 md:gap-4">
               {networkCards.map((card) => {
@@ -820,7 +797,7 @@ const Theme5: React.FC = () => {
                     key={card.key}
                     type="button"
                     onClick={() => setSelectedNetworkKey(card.key)}
-                    className="rounded-[22px] border p-3 text-left transition-all md:p-4"
+                    className="group rounded-[24px] border p-3 text-left transition-all duration-300 hover:-translate-y-1 md:p-4"
                     style={{
                       borderColor: isSelected ? sectionAccent : "#e4e7ef",
                       background: isSelected
@@ -873,7 +850,14 @@ const Theme5: React.FC = () => {
               })}
             </div>
 
-            <div className="mt-6 rounded-[26px] border border-[#e2e7f0] bg-white p-4 shadow-[0_18px_36px_rgba(15,23,43,0.04)] sm:p-5">
+            <div className="mt-6 rounded-[28px] border border-[#e2eaf4] bg-white p-4 shadow-[0_20px_44px_rgba(30,59,106,0.06)] sm:p-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#7688a2]">02 · Recipient details</p>
+                  <p className="mt-1 text-sm font-bold text-[#10213c]">Who should receive the data?</p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#eff5ff]" style={{ color: sectionAccent }}><Headphones size={18} /></div>
+              </div>
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">
                 Recipient&apos;s Number
               </label>
@@ -882,7 +866,7 @@ const Theme5: React.FC = () => {
                 value={recipientNumber}
                 onChange={(event) => setRecipientNumber(event.target.value)}
                 placeholder="e.g. 054 123 4567"
-                className="w-full rounded-xl border border-[#e1d8ca] bg-[#fbfaf8] px-4 py-3 text-sm outline-none transition focus:border-[var(--theme5-primary)]"
+                className="w-full rounded-2xl border border-[#dfe8f3] bg-[#fbfdff] px-4 py-3.5 text-sm font-medium text-[#10213c] outline-none transition focus:border-[var(--theme5-primary)] focus:ring-4 focus:ring-[#edf3ff]"
                 style={{ ["--theme5-primary" as any]: sectionAccent } as React.CSSProperties}
               />
 
