@@ -3,6 +3,11 @@ const nextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+  experimental: {
+    // Shared cPanel accounts can terminate parallel Next.js build workers for
+    // exceeding their per-account memory limit. One worker is slower but stable.
+    cpus: 1
+  },
   turbopack: {
     root: __dirname
   },
