@@ -485,16 +485,6 @@ const Theme5: React.FC = () => {
       className="min-h-screen overflow-x-hidden bg-[#f7f9fc] text-[#10213c]"
       style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}
     >
-      <style>{`
-        .theme5-hero {
-          background:
-            radial-gradient(circle at 7% 8%, ${primaryRgba(0.18)} 0, transparent 26rem),
-            radial-gradient(circle at 92% 12%, rgba(79, 109, 245, 0.15) 0, transparent 25rem),
-            linear-gradient(135deg, #ffffff 0%, #f4f7ff 52%, #effaf8 100%);
-          box-shadow: 0 26px 70px rgba(23, 49, 92, 0.10);
-        }
-      `}</style>
-
       <header className="sticky top-0 z-40 border-b border-[#e7edf6] bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex h-[76px] w-full max-w-[1180px] items-center justify-between px-4 md:px-6">
           <button
@@ -607,7 +597,7 @@ const Theme5: React.FC = () => {
       </header>
 
       <main className="mx-auto w-full max-w-[1180px] px-4 pb-40 pt-7 md:px-6 md:pb-16 md:pt-10">
-        <section className="theme5-hero relative overflow-hidden rounded-[34px] border border-white px-5 py-9 sm:px-9 lg:px-12 lg:py-12">
+        <section className="relative px-5 py-9 sm:px-9 lg:px-12 lg:py-12">
           <div className="relative grid gap-10 lg:grid-cols-[1.04fr_0.96fr] lg:items-center">
             <div className="max-w-[620px]">
               <h1 className="text-[44px] font-extrabold leading-[1.02] tracking-[-0.055em] text-[#10213c] sm:text-[62px] lg:text-[68px]">
