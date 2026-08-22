@@ -603,7 +603,7 @@ const Theme5: React.FC = () => {
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-[1180px] px-4 pb-40 pt-7 md:px-6 md:pb-16 md:pt-10">
+      <main className="mx-auto w-full max-w-[1180px] px-4 pb-12 pt-7 md:px-6 md:pb-16 md:pt-10">
         <section className="relative px-5 py-9 sm:px-9 lg:px-12 lg:py-12">
           <div className="relative grid gap-10 lg:grid-cols-[1.04fr_0.96fr] lg:items-center">
             <div className="hidden max-w-[620px] sm:block">
@@ -654,7 +654,7 @@ const Theme5: React.FC = () => {
           </div>
         </section>
 
-        <section id="network-section" className="mt-3 grid gap-6 sm:mt-16 lg:grid-cols-[1.5fr_0.8fr]">
+        <section id="network-section" className="-mt-5 grid gap-6 sm:mt-16 lg:grid-cols-[1.5fr_0.8fr]">
           <div>
             <div className="flex items-center justify-between gap-4 sm:items-end">
               <div>
@@ -957,7 +957,7 @@ const Theme5: React.FC = () => {
       </footer>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 text-white shadow-[0_-18px_42px_rgba(15,23,43,0.24)] backdrop-blur md:hidden"
+        className="hidden"
         style={{ backgroundColor: "rgba(15, 23, 43, 0.96)" }}
       >
         <div className="mx-auto max-w-[1180px]">
