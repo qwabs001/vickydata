@@ -654,7 +654,7 @@ const Theme5: React.FC = () => {
           </div>
         </section>
 
-        <section id="network-section" className="mt-16 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
+        <section id="network-section" className="mt-3 grid gap-6 sm:mt-16 lg:grid-cols-[1.5fr_0.8fr]">
           <div>
             <div className="flex items-center justify-between gap-4 sm:items-end">
               <div>
