@@ -956,73 +956,6 @@ const Theme5: React.FC = () => {
         copyright 2026 - VickyData
       </footer>
 
-      <div
-        className="hidden"
-        style={{ backgroundColor: "rgba(15, 23, 43, 0.96)" }}
-      >
-        <div className="mx-auto max-w-[1180px]">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
-                Order Summary
-              </p>
-              <p className="mt-1 truncate text-sm font-semibold text-white">
-                {selectedNetworkName} • {selectedBundleName}
-              </p>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
-                Total Pay
-              </p>
-              <p className="mt-1 text-[24px] font-extrabold leading-none" style={{ color: primaryColor }}>
-                {formatCurrency(totalCharge, selectedPlan?.currency || "GHS")}
-              </p>
-            </div>
-          </div>
-
-          {isAuthenticated ? (
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60">
-                  Pay from wallet
-                </p>
-                <p className="mt-1 truncate text-sm font-semibold text-white">
-                  {walletLoading ? "Checking balance..." : formatCurrency(walletBalance.currentBalance, "GHS")}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setUseWalletBalance((current) => !current)}
-                disabled={!selectedPlan || walletLoading}
-                className="relative h-8 w-14 rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60"
-                style={{
-                  borderColor: useWalletBalance ? primaryColor : "rgba(255,255,255,0.14)",
-                  backgroundColor: useWalletBalance ? primaryColor : "rgba(255,255,255,0.08)",
-                }}
-                aria-pressed={useWalletBalance}
-                aria-label="Toggle wallet payment"
-              >
-                <span
-                  className="absolute top-1 h-6 w-6 rounded-full bg-white transition-all"
-                  style={{ left: useWalletBalance ? "1.85rem" : "0.2rem" }}
-                />
-              </button>
-            </div>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={handleSecurePay}
-            disabled={payActionDisabled}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ backgroundColor: primaryColor, color: deepSurfaceColor }}
-          >
-            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-            {payButtonLabel}
-          </button>
-        </div>
-      </div>
-
       {showRecipientSheet && selectedPlan ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="recipient-sheet-title">
           <button
@@ -1049,7 +982,7 @@ const Theme5: React.FC = () => {
             </div>
 
             <div className="mt-5 rounded-2xl bg-[#f5f8fd] px-4 py-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#70809a]">Selected package</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#70809a]">Order summary</p>
               <div className="mt-1 flex items-center justify-between gap-4">
                 <p className="truncate font-extrabold text-[#162033]">{selectedNetworkName} · {selectedPlan.name}</p>
                 <p className="shrink-0 font-extrabold" style={{ color: sectionAccent }}>{formatCurrency(totalCharge, selectedPlan.currency || "GHS")}</p>
@@ -1069,6 +1002,34 @@ const Theme5: React.FC = () => {
               className="w-full rounded-2xl border border-[#dfe8f3] bg-[#fbfdff] px-4 py-3.5 text-base font-medium text-[#10213c] outline-none transition focus:border-[var(--theme5-primary)] focus:ring-4 focus:ring-[#edf3ff]"
               style={{ ["--theme5-primary" as any]: sectionAccent } as React.CSSProperties}
             />
+
+            {isAuthenticated ? (
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[#dfe8f3] bg-[#fbfdff] px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#70809a]">Pay from wallet</p>
+                  <p className="mt-1 truncate text-sm font-extrabold text-[#162033]">
+                    {walletLoading ? "Checking balance..." : `${formatCurrency(walletBalance.currentBalance, "GHS")} available`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUseWalletBalance((current) => !current)}
+                  disabled={walletLoading}
+                  className="relative h-8 w-14 shrink-0 rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    borderColor: useWalletBalance ? sectionAccent : "#d7dfeb",
+                    backgroundColor: useWalletBalance ? sectionAccent : "#e9eef6",
+                  }}
+                  aria-pressed={useWalletBalance}
+                  aria-label="Toggle wallet payment"
+                >
+                  <span
+                    className="absolute top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-all"
+                    style={{ left: useWalletBalance ? "1.85rem" : "0.2rem" }}
+                  />
+                </button>
+              </div>
+            ) : null}
 
             <button
               type="button"
