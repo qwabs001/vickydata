@@ -599,7 +599,7 @@ const Theme5: React.FC = () => {
       <main className="mx-auto w-full max-w-[1180px] px-4 pb-40 pt-7 md:px-6 md:pb-16 md:pt-10">
         <section className="relative px-5 py-9 sm:px-9 lg:px-12 lg:py-12">
           <div className="relative grid gap-10 lg:grid-cols-[1.04fr_0.96fr] lg:items-center">
-            <div className="max-w-[620px]">
+            <div className="hidden max-w-[620px] sm:block">
               <h1 className="hidden text-[44px] font-extrabold leading-[1.02] tracking-[-0.055em] text-[#10213c] sm:block sm:text-[62px] lg:text-[68px]">
                 Data that moves
                 <span className="block" style={{ color: sectionAccent }}>with your day.</span>
