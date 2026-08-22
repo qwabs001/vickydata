@@ -6,7 +6,6 @@ import {
   Bolt,
   ChevronRight,
   Clock3,
-  Headphones,
   Loader2,
   Lock,
   Menu,
@@ -92,6 +91,7 @@ const Theme5: React.FC = () => {
   const [showAllPlans, setShowAllPlans] = useState(false);
   const [useWalletBalance, setUseWalletBalance] = useState(false);
   const [recipientNumber, setRecipientNumber] = useState("");
+  const [showRecipientSheet, setShowRecipientSheet] = useState(false);
   const [checkoutState, setCheckoutState] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -263,6 +263,13 @@ const Theme5: React.FC = () => {
     e.preventDefault();
     setShowSignup(true);
     setSignupError(null);
+  };
+
+  const handlePlanSelect = (plan: DataPlan) => {
+    setSelectedPlan(plan);
+    setCheckoutState("idle");
+    setCheckoutMessage("");
+    setShowRecipientSheet(true);
   };
 
   const handleNavigation = (e: React.MouseEvent<HTMLButtonElement>, url: string) => {
@@ -728,31 +735,8 @@ const Theme5: React.FC = () => {
             <div className="mt-6 rounded-[28px] border border-[#e2eaf4] bg-white p-4 shadow-[0_20px_44px_rgba(30,59,106,0.06)] sm:p-6">
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#7688a2]"><span className="sm:hidden">2 · </span><span className="hidden sm:inline">02 · </span>Recipient details</p>
-                  <p className="mt-1 text-sm font-bold text-[#10213c]">Who should receive the data?</p>
-                </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#eff5ff]" style={{ color: sectionAccent }}><Headphones size={18} /></div>
-              </div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">
-                Recipient&apos;s Number
-              </label>
-              <input
-                type="tel"
-                value={recipientNumber}
-                onChange={(event) => setRecipientNumber(event.target.value)}
-                placeholder="e.g. 054 123 4567"
-                className="w-full rounded-2xl border border-[#dfe8f3] bg-[#fbfdff] px-4 py-3.5 text-sm font-medium text-[#10213c] outline-none transition focus:border-[var(--theme5-primary)] focus:ring-4 focus:ring-[#edf3ff]"
-                style={{ ["--theme5-primary" as any]: sectionAccent } as React.CSSProperties}
-              />
-
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">
-                    Choose Data Package
-                  </p>
-                  <p className="mt-1 text-sm text-[#697488]">
-                    Showing plans currently mapped to {selectedNetworkName}.
-                  </p>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#7688a2]"><span className="sm:hidden">2 · </span><span className="hidden sm:inline">02 · </span>Choose data package</p>
+                  <p className="mt-1 text-sm font-bold text-[#10213c]">Select a package for {selectedNetworkName}.</p>
                 </div>
                 {filteredPlans.length > 0 ? (
                   <span
@@ -775,7 +759,7 @@ const Theme5: React.FC = () => {
                         <button
                           key={plan.id}
                           type="button"
-                          onClick={() => setSelectedPlan(plan)}
+                          onClick={() => handlePlanSelect(plan)}
                           className="rounded-[22px] border px-4 py-4 text-left transition-all"
                           style={{
                             borderColor: selected ? sectionAccent : "#e4e8f0",
@@ -1038,6 +1022,73 @@ const Theme5: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {showRecipientSheet && selectedPlan ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="recipient-sheet-title">
+          <button
+            type="button"
+            aria-label="Close recipient details"
+            className="absolute inset-0 bg-[#0f172b]/55"
+            onClick={() => setShowRecipientSheet(false)}
+          />
+          <div className="relative w-full max-w-[560px] rounded-t-[30px] bg-white px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-18px_50px_rgba(15,23,43,0.24)] sm:rounded-[30px] sm:p-7">
+            <div className="mx-auto h-1.5 w-12 rounded-full bg-[#dbe2ec] sm:hidden" />
+            <div className="mt-5 flex items-start justify-between gap-4 sm:mt-0">
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.14em]" style={{ color: sectionAccent }}>3 · Recipient details</p>
+                <h2 id="recipient-sheet-title" className="mt-1 text-xl font-extrabold text-[#10213c]">Who should receive the data?</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRecipientSheet(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[#dfe8f3] text-[#52627c]"
+                aria-label="Close"
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-[#f5f8fd] px-4 py-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#70809a]">Selected package</p>
+              <div className="mt-1 flex items-center justify-between gap-4">
+                <p className="truncate font-extrabold text-[#162033]">{selectedNetworkName} · {selectedPlan.name}</p>
+                <p className="shrink-0 font-extrabold" style={{ color: sectionAccent }}>{formatCurrency(totalCharge, selectedPlan.currency || "GHS")}</p>
+              </div>
+            </div>
+
+            <label className="mb-2 mt-5 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8f836f]">
+              Recipient&apos;s number
+            </label>
+            <input
+              autoFocus
+              type="tel"
+              inputMode="numeric"
+              value={recipientNumber}
+              onChange={(event) => setRecipientNumber(event.target.value)}
+              placeholder="e.g. 054 123 4567"
+              className="w-full rounded-2xl border border-[#dfe8f3] bg-[#fbfdff] px-4 py-3.5 text-base font-medium text-[#10213c] outline-none transition focus:border-[var(--theme5-primary)] focus:ring-4 focus:ring-[#edf3ff]"
+              style={{ ["--theme5-primary" as any]: sectionAccent } as React.CSSProperties}
+            />
+
+            <button
+              type="button"
+              onClick={handleSecurePay}
+              disabled={payActionDisabled}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-extrabold text-[#16120a] disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ backgroundColor: primaryColor }}
+            >
+              {isSubmitting ? <Loader2 size={17} className="animate-spin" /> : <Lock size={17} />}
+              {payButtonLabel}
+            </button>
+
+            {checkoutMessage ? (
+              <p className={`mt-3 text-center text-sm font-semibold ${checkoutState === "error" ? "text-red-600" : "text-[#52627c]"}`}>
+                {checkoutMessage}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <LoginModal
         open={showLogin}
