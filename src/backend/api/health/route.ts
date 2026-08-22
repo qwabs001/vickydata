@@ -4,7 +4,10 @@ import { prisma } from "@/backend/lib/db/prisma";
 export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return NextResponse.json({ ok: true, database: "connected" });
+    return NextResponse.json(
+      { ok: true, database: "connected" },
+      { headers: { "X-LiteSpeed-Purge": "/" } }
+    );
   } catch (error) {
     const err = error as unknown as {
       name?: string;
@@ -39,7 +42,7 @@ export async function GET() {
           cause
         }
       },
-      { status: 503 }
+      { status: 503, headers: { "X-LiteSpeed-Purge": "/" } }
     );
   }
 }
