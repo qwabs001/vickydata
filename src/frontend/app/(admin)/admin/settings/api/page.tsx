@@ -64,7 +64,31 @@ function isDataFraternityUrl(url: string): boolean {
   return /datafraternity\.com/i.test(url);
 }
 
+function isResellerV1Url(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)bundlearena\.com$/i.test(parsed.hostname) && /\/api\/v1\/?$/i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function getProviderDefaults(baseUrl: string) {
+  if (isResellerV1Url(baseUrl)) {
+    return {
+      provider: "reseller-v1",
+      name: "BundleArena Reseller API",
+      endpoints: {
+        test: "/services",
+        networks: "/services",
+        plans: "/services",
+        purchase: "/orders",
+        status: "/orders/{reference}",
+        purchaseMethod: "POST" as const
+      }
+    };
+  }
+
   if (isDataFraternityUrl(baseUrl)) {
     return {
       provider: "datafraternity",
@@ -125,7 +149,7 @@ function getProviderDefaults(baseUrl: string) {
 function normalizeEndpointValue(baseUrl: string, value: string | undefined, fallback: string): string {
   const trimmed = value?.trim() ?? "";
   if (!trimmed) return fallback;
-  if (isJaybartUrl(baseUrl) && GENERIC_LEGACY_ENDPOINTS.has(trimmed.toLowerCase())) {
+  if ((isJaybartUrl(baseUrl) || isResellerV1Url(baseUrl)) && GENERIC_LEGACY_ENDPOINTS.has(trimmed.toLowerCase())) {
     return fallback;
   }
   return trimmed;

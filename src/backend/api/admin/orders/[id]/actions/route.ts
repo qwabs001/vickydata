@@ -179,6 +179,21 @@ export async function POST(
       if (order.status === "COMPLETED" && order.apiResponsePayload) {
         return NextResponse.json({ error: "Order already completed." }, { status: 400 });
       }
+      // A rejected provider request is safe to retry: no provider order was
+      // created, but the immutable dispatch claim from the failed attempt must
+      // be released first. Never clear a claim that has a provider response,
+      // because that could submit a duplicate fulfilled order.
+      if (order.providerDispatchStartedAt && order.failedReason && !order.apiResponsePayload) {
+        await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            providerDispatchStartedAt: null,
+            providerDispatchProvider: null,
+            autoFulfillmentEligible: true,
+            failedReason: null
+          }
+        });
+      }
       // Remove payment status check - allow admin to resend regardless of payment status
       try {
         const result = await dataProviderService.fulfillOrder(order.id, { manual: true });

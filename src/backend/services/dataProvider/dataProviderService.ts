@@ -14,6 +14,14 @@ type EndpointsConfig = {
 
 const JAYBART_PROVIDER = "jaybart";
 const DATAFRATERNITY_PROVIDER = "datafraternity";
+const RESELLER_V1_PROVIDER = "reseller-v1";
+const RESELLER_V1_ENDPOINT_DEFAULTS = {
+  test: "/services",
+  services: "/services",
+  purchase: "/orders",
+  status: "/orders/{reference}",
+  purchaseMethod: "POST" as const
+};
 const DATAFRATERNITY_ENDPOINT_DEFAULTS = {
   test: "/wallet",
   offers: "/special-offers",
@@ -52,7 +60,6 @@ const V1_STATUS_ENDPOINT_TEMPLATES = [
   "/normal-orders/{reference}",
   "/normal-orders?reference={reference}"
 ];
-const SERIALIZED_ACTIVE_ORDER_STATUSES = ["PENDING", "PROCESSING"] as const;
 
 function uniqueNonEmptyPaths(values: Array<string | undefined | null>): string[] {
   const seen = new Set<string>();
@@ -86,6 +93,14 @@ function getV1StatusCandidateTemplates(endpoints: EndpointsConfig): string[] {
 }
 
 function getProviderTestCandidatePaths(config: ApiConfiguration, endpoints: EndpointsConfig): string[] {
+  if (isResellerV1Provider(config)) {
+    return uniqueNonEmptyPaths([
+      endpoints.test,
+      endpoints.networks,
+      RESELLER_V1_ENDPOINT_DEFAULTS.test
+    ]);
+  }
+
   if (isGhBundleBaseUrl(config.baseUrl)) {
     return uniqueNonEmptyPaths([
       resolveGhBundleEndpoint(endpoints.test, "/balance"),
@@ -226,7 +241,14 @@ async function findBlockingSerializedOrder(orderId: string) {
     where: {
       recipientNumber: order.recipientNumber,
       paymentStatus: "COMPLETED",
-      status: { in: [...SERIALIZED_ACTIVE_ORDER_STATUSES] }
+      OR: [
+        { status: "PROCESSING" },
+        {
+          status: "PENDING",
+          providerDispatchStartedAt: null,
+          failedReason: null
+        }
+      ]
     },
     select: {
       id: true,
@@ -599,8 +621,21 @@ function isV1Provider(config: { provider: string; baseUrl?: string; endpoints?: 
   const endpoints = (config.endpoints as Record<string, string> | null) ?? null;
   const purchase = endpoints?.purchase ?? "";
   const baseUrl = config.baseUrl ?? "";
-  if (isJaybartBaseUrl(baseUrl)) return false;
+  if (isJaybartBaseUrl(baseUrl) || isResellerV1Provider(config)) return false;
   return config.provider === "v1" || purchase.includes("normal-orders");
+}
+
+function isResellerV1Provider(config: { provider: string; baseUrl?: string }): boolean {
+  if (config.provider === RESELLER_V1_PROVIDER) return true;
+  try {
+    const url = new URL(config.baseUrl ?? "");
+    return (
+      /(^|\.)bundlearena\.com$/i.test(url.hostname) &&
+      /\/api\/v1\/?$/i.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isGhBundleBaseUrl(baseUrl: string): boolean {
@@ -1430,6 +1465,51 @@ async function fetchGhBundleServices(config: ApiConfiguration): Promise<GhBundle
   return allServices;
 }
 
+async function fetchResellerV1Services(config: ApiConfiguration): Promise<GhBundleService[]> {
+  const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
+  const configuredPath = endpoints.networks?.trim() || endpoints.plans?.trim();
+  const servicesPath = configuredPath && !GENERIC_LEGACY_ENDPOINTS.has(configuredPath.toLowerCase())
+    ? configuredPath
+    : RESELLER_V1_ENDPOINT_DEFAULTS.services;
+  const allServices: GhBundleService[] = [];
+
+  let page = 1;
+  let hasMore = true;
+  while (hasMore && page <= 100) {
+    const separator = servicesPath.includes("?") ? "&" : "?";
+    const payload = await apiRequest<unknown>(
+      config.baseUrl,
+      `${servicesPath}${separator}page=${page}&limit=100`,
+      {
+        method: "GET",
+        apiKey: config.apiKey,
+        apiSecret: config.apiSecret ?? undefined
+      }
+    );
+    const root = toObject(payload);
+    const nestedData = toObject(root?.data);
+    const services = Array.isArray(payload)
+      ? payload
+      : Array.isArray(root?.services)
+        ? root.services
+        : Array.isArray(root?.data)
+          ? root.data
+          : Array.isArray(nestedData?.services)
+            ? nestedData.services
+            : [];
+    allServices.push(...(services as GhBundleService[]));
+
+    const pagination = toObject(root?.pagination) ?? toObject(nestedData?.pagination);
+    const hasMoreFlag = parseBooleanLike(pagination?.has_more);
+    const total = Number(pagination?.total ?? allServices.length);
+    const limit = Number(pagination?.limit ?? 100);
+    hasMore = hasMoreFlag ?? page * limit < total;
+    page++;
+  }
+
+  return allServices;
+}
+
 async function fetchJaybartNetworks(config: ApiConfiguration): Promise<JaybartNetwork[]> {
   const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
   const path = resolveJaybartEndpoint(endpoints.networks, JAYBART_ENDPOINT_DEFAULTS.networks);
@@ -1860,6 +1940,7 @@ async function syncGhBundleNetworksAndPlans(
             dataInMB,
             price,
             validity,
+            providerPackageId: service.service_id?.toString() || null,
             sortOrder: planSort
           },
           update: {
@@ -1867,6 +1948,7 @@ async function syncGhBundleNetworksAndPlans(
             dataInMB,
             price,
             validity,
+            providerPackageId: service.service_id?.toString() || null,
             sortOrder: planSort
           }
         });
@@ -1894,6 +1976,27 @@ async function fetchProviderOrderStatusPayload(
   const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
   const providerReference = extractProviderReference(order.apiResponsePayload) ?? order.paymentReference;
   const isGhBundle = isGhBundleBaseUrl(config.baseUrl);
+
+  if (isResellerV1Provider(config)) {
+    const reference = extractProviderReference(order.apiResponsePayload);
+    if (!reference) return null;
+    const statusTemplate = endpoints.status?.trim() || RESELLER_V1_ENDPOINT_DEFAULTS.status;
+    const statusPath = buildStatusPath(statusTemplate, {
+      reference,
+      orderId: order.id,
+      orderNumber: order.orderNumber
+    });
+    try {
+      return await apiRequest<unknown>(config.baseUrl, statusPath, {
+        method: "GET",
+        apiKey: config.apiKey,
+        apiSecret: config.apiSecret ?? undefined
+      });
+    } catch (error) {
+      console.warn("[provider status] Reseller V1 status lookup failed:", statusPath, error);
+      return null;
+    }
+  }
 
   if (isJaybartProvider(config)) {
     if (!providerReference) return null;
@@ -2307,6 +2410,15 @@ export const dataProviderService = {
     }
   }
 
+  if (isResellerV1Provider(config)) {
+    try {
+      const services = await fetchResellerV1Services(config);
+      return { ok: true, networks: mapGhBundleServicesToPreviewNetworks(services) };
+    } catch (error) {
+      return { ok: false, networks: [], error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
   if (isV1Provider(config)) {
       return {
         ok: true,
@@ -2568,6 +2680,17 @@ export const dataProviderService = {
       return syncGhBundleNetworksAndPlans(config, options);
     }
 
+    if (isResellerV1Provider(config)) {
+      const resellerConfig = {
+        ...config,
+        endpoints: {
+          ...((config.endpoints as Record<string, unknown> | null) ?? {}),
+          networks: RESELLER_V1_ENDPOINT_DEFAULTS.services
+        }
+      } as ApiConfiguration;
+      return syncGhBundleNetworksAndPlans(resellerConfig, options);
+    }
+
     if (isJaybartProvider(config)) {
       return syncJaybartNetworksAndPlans(config, options);
     }
@@ -2789,10 +2912,9 @@ export const dataProviderService = {
     // so admin and sync flows do not treat it as just queued/pending.
     if (
       order.status === "PENDING" &&
-      (order.paymentReference != null ||
-        (order.apiResponsePayload != null &&
-          typeof order.apiResponsePayload === "object" &&
-          Object.keys(order.apiResponsePayload as Record<string, unknown>).length > 0))
+      order.apiResponsePayload != null &&
+      typeof order.apiResponsePayload === "object" &&
+      Object.keys(order.apiResponsePayload as Record<string, unknown>).length > 0
     ) {
       await prisma.order.update({
         where: { id: orderId },
@@ -2857,10 +2979,13 @@ export const dataProviderService = {
     const endpoints = (config.endpoints ?? {}) as EndpointsConfig;
     // Detect GhBundle API (direct or proxy URLs)
     const isGhBundle = isGhBundleBaseUrl(config.baseUrl);
+    const isResellerV1 = isResellerV1Provider(config);
     const isJaybart = isJaybartProvider(config);
     const isDataFraternity = isDataFraternityProvider(config);
     const isV1 = isV1Provider(config);
-    const purchasePaths = isGhBundle
+    const purchasePaths = isResellerV1
+      ? [RESELLER_V1_ENDPOINT_DEFAULTS.purchase]
+      : isGhBundle
       ? [resolveGhBundleEndpoint(endpoints.purchase, "/orders")]
       : isJaybart
         ? [resolveJaybartEndpoint(endpoints.purchase, JAYBART_ENDPOINT_DEFAULTS.purchase)]
@@ -2869,7 +2994,9 @@ export const dataProviderService = {
       : isV1
         ? getV1PurchaseCandidatePaths(endpoints)
         : [endpoints.purchase ?? "/api/purchase"];
-    const purchaseMethod = isJaybart
+    const purchaseMethod = isResellerV1
+      ? RESELLER_V1_ENDPOINT_DEFAULTS.purchaseMethod
+      : isJaybart
       ? JAYBART_ENDPOINT_DEFAULTS.purchaseMethod
       : isDataFraternity
         ? DATAFRATERNITY_ENDPOINT_DEFAULTS.purchaseMethod
@@ -2877,7 +3004,52 @@ export const dataProviderService = {
 
     let payload: object;
     let v1PayloadCandidates: V1PurchasePayload[] | null = null;
-    if (isGhBundle) {
+    if (isResellerV1) {
+      let serviceId = order.dataPlan?.providerPackageId?.trim() || null;
+      if (!serviceId) {
+        try {
+          const services = await fetchResellerV1Services(config);
+          const normalize = (value: unknown) => String(value ?? "")
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9.]/g, "");
+          const wantedNetwork = normalize(order.network?.displayName || order.network?.name);
+          const wantedPlanValues = new Set([
+            normalize(order.dataPlan?.name),
+            normalize(order.dataPlan?.dataAmount)
+          ].filter(Boolean));
+          const matched = services.find((service) => {
+            const networkMatches = !wantedNetwork || normalize(service.network) === wantedNetwork;
+            const serviceValues = [normalize(service.plan_name), normalize(service.volume)];
+            return networkMatches && serviceValues.some((value) => wantedPlanValues.has(value));
+          });
+          serviceId = matched?.service_id?.trim() || null;
+          if (serviceId && order.dataPlanId) {
+            await prisma.dataPlan.update({
+              where: { id: order.dataPlanId },
+              data: { providerPackageId: serviceId }
+            }).catch(() => {});
+          }
+        } catch (lookupError) {
+          console.warn("[fulfillOrder] Reseller V1 service lookup failed:", lookupError);
+        }
+      }
+
+      if (!serviceId) {
+        return {
+          ok: false,
+          error: "This package is not linked to a provider service. Sync services in Settings > API Configuration, then resend the order."
+        };
+      }
+
+      payload = {
+        service_id: serviceId,
+        phone: toLocalGhanaPhone(order.recipientNumber),
+        qty: 1,
+        client_order_id: order.orderNumber
+      };
+      console.log("[fulfillOrder] Reseller V1 payload:", JSON.stringify(payload));
+    } else if (isGhBundle) {
       // GhBundle API format: {service_id, phone, qty, client_order_id}
       // Try to get service_id from externalOrder if available
       let serviceId: string | null = null;
