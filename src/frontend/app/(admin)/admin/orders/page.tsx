@@ -71,6 +71,7 @@ export default function Page() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<(typeof statusFilters)[number]>("All Status");
   const [networkFilter, setNetworkFilter] = useState("All Networks");
@@ -224,6 +225,7 @@ export default function Page() {
     }
     setActionLoadingId(orderId);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/actions`, {
         method: "POST",
@@ -237,8 +239,10 @@ export default function Page() {
       }
       if (action === "delete") {
         setOrders((current) => current.filter((order) => order.id !== orderId));
+        setNotice("Order deleted.");
         return;
       }
+      setNotice(data?.message ?? (action === "resend" ? "Order submitted to the provider." : "Order updated."));
       handleRefresh();
     } catch {
       setError("Unable to process action.");
@@ -288,6 +292,12 @@ export default function Page() {
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
           {error}
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {notice}
         </div>
       ) : null}
 
@@ -362,7 +372,7 @@ export default function Page() {
               const statusLabel = statusMap[order.status] ?? order.status;
               const planLabel = order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "Plan";
               const canRefund = order.paymentStatus === "COMPLETED" && order.paymentStatus !== "REFUNDED";
-              const canResend = order.status !== "COMPLETED";
+              const canResend = order.status !== "COMPLETED" && order.status !== "CANCELLED" && order.paymentStatus !== "REFUNDED";
               const canMarkPending = order.status !== "PENDING" && order.status !== "COMPLETED";
               const canMarkInprogress = order.status !== "PROCESSING" && order.status !== "COMPLETED";
               return (
@@ -554,7 +564,7 @@ export default function Page() {
                   const statusLabel = statusMap[order.status] ?? order.status;
                   const planLabel = order.dataPlan?.dataAmount ?? order.dataPlan?.name ?? "Plan";
                   const canRefund = order.paymentStatus === "COMPLETED" && order.paymentStatus !== "REFUNDED";
-                  const canResend = order.status !== "COMPLETED";
+                  const canResend = order.status !== "COMPLETED" && order.status !== "CANCELLED" && order.paymentStatus !== "REFUNDED";
                   const canMarkPending = order.status !== "PENDING" && order.status !== "COMPLETED";
                   const canMarkInprogress = order.status !== "PROCESSING" && order.status !== "COMPLETED";
                   return (

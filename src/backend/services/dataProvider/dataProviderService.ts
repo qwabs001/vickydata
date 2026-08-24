@@ -921,12 +921,14 @@ function classifyStatusValue(value: unknown): ProviderOrderState {
     normalized === "error" ||
     normalized === "declined" ||
     normalized === "rejected" ||
+    normalized === "refunded" ||
     normalized === "cancelled" ||
     normalized === "canceled" ||
     normalized.includes("failed") ||
     normalized.includes("error") ||
     normalized.includes("declined") ||
     normalized.includes("reject") ||
+    normalized.includes("refund") ||
     normalized.includes("cancel")
   ) {
     return "FAILED";
@@ -2224,6 +2226,10 @@ async function markOrderFailed(
   } catch (webhookErr) {
     console.error("[provider] Reseller webhook enqueue error:", webhookErr);
   }
+
+  // A failed/refunded provider order no longer blocks delivery to the same
+  // recipient. Continue the serialized queue automatically.
+  await releaseNextQueuedSerializedOrder(orderId);
 }
 
 async function syncOrderStatusInternal(orderId: string): Promise<{ ok: boolean; status?: string; error?: string }> {
@@ -3409,6 +3415,10 @@ export const dataProviderService = {
 
   async syncOrderStatus(orderId: string): Promise<{ ok: boolean; status?: string; error?: string }> {
     return syncOrderStatusInternal(orderId);
+  },
+
+  async releaseNextQueuedOrder(orderId: string): Promise<void> {
+    await releaseNextQueuedSerializedOrder(orderId);
   },
 
   async syncUserInProgressOrders(userId: string): Promise<void> {

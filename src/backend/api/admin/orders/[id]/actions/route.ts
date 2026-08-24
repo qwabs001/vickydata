@@ -175,6 +175,12 @@ export async function POST(
     const adminId = request.headers.get("x-user-id") ?? undefined;
 
     if (action === "resend") {
+      if (order.status === "CANCELLED" || order.paymentStatus === "REFUNDED") {
+        return NextResponse.json(
+          { error: "This order was cancelled and refunded. Create a new paid order before sending it to the provider." },
+          { status: 400 }
+        );
+      }
       // Allow resending even if payment not completed (admin has funds in provider)
       if (order.status === "COMPLETED" && order.apiResponsePayload) {
         return NextResponse.json({ error: "Order already completed." }, { status: 400 });
@@ -198,7 +204,12 @@ export async function POST(
       try {
         const result = await dataProviderService.fulfillOrder(order.id, { manual: true });
         if (result.ok) {
-          return NextResponse.json({ ok: true, reference: result.reference });
+          const message = result.status === "PENDING"
+            ? "Order is queued behind an earlier active order for this recipient. It will be sent automatically when that order finishes."
+            : result.status === "PROCESSING"
+              ? "Order sent to the provider and is processing."
+              : "Order submitted successfully.";
+          return NextResponse.json({ ok: true, reference: result.reference, status: result.status, message });
         }
         return NextResponse.json({ error: result.error ?? "Fulfillment failed." }, { status: 400 });
       } catch (fulfillError) {
@@ -236,6 +247,7 @@ export async function POST(
         console.error("[Admin] Order complete SMS error:", smsErr);
       }
       await notifyResellerOrderStatusChange(id);
+      await dataProviderService.releaseNextQueuedOrder(id);
       return NextResponse.json({ ok: true });
     }
 
@@ -349,6 +361,7 @@ export async function POST(
       });
 
       await notifyResellerOrderStatusChange(id);
+      await dataProviderService.releaseNextQueuedOrder(id);
       return NextResponse.json({ ok: true });
     }
 
@@ -377,6 +390,7 @@ export async function POST(
       }
     });
     await notifyResellerOrderStatusChange(id);
+    await dataProviderService.releaseNextQueuedOrder(id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Order action error:", error);
