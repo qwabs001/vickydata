@@ -787,7 +787,7 @@ export default function CustomerDashboardPage() {
               </div>
               <p className="mt-5 text-sm font-semibold text-slate-900">Processing payment...</p>
               <p className="mt-2 text-xs text-slate-500 text-center">
-                Opening the Moolre checkout page. Please wait.
+                Opening the Paystack checkout page. Please wait.
               </p>
             </div>
           ) : (
@@ -849,7 +849,7 @@ export default function CustomerDashboardPage() {
                   <path d="M12 8h.01" />
                 </svg>
                 <p className="text-xs text-blue-700">
-                  You will be redirected to Moolre to complete the payment.
+                  You will be redirected to Paystack to complete the payment.
                 </p>
               </div>
 
@@ -920,7 +920,7 @@ export default function CustomerDashboardPage() {
             onClick={handleAgentUpgradeProceed}
             disabled={agentUpgradeSubmitting}
           >
-            {agentUpgradeSubmitting ? "Opening Moolre..." : "Proceed"}
+            {agentUpgradeSubmitting ? "Opening Paystack..." : "Proceed"}
           </button>
         </div>
       </Dialog>

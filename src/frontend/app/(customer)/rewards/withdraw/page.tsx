@@ -480,7 +480,7 @@ export default function WalletPage() {
             />
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            You will be redirected to Moolre to complete the payment.
+            You will be redirected to Paystack to complete the payment.
           </p>
           <button
             type="button"
@@ -525,7 +525,7 @@ export default function WalletPage() {
             }}
             disabled={walletAddSubmitting}
           >
-            {walletAddSubmitting ? "Opening Moolre..." : "Add Funds"}
+            {walletAddSubmitting ? "Opening Paystack..." : "Add Funds"}
           </button>
         </div>
       </Dialog>

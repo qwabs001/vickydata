@@ -16,7 +16,7 @@ const cards = [
   },
   {
     title: "Payments",
-    description: "Configure Moolre as the primary gateway and keep Paystack only for legacy fallback.",
+    description: "Configure Paystack for purchases, wallet top-ups, and agent upgrades.",
     href: "/admin/settings/payments"
   },
   {

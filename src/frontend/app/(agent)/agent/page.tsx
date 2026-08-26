@@ -560,7 +560,7 @@ export default function AgentDashboardPage() {
       <Dialog open={showWalletModal} onClose={() => setShowWalletModal(false)} mobileBottomSheet>
         <div className="p-6">
           <h3 className="text-lg font-semibold text-slate-900">Add Wallet Funds</h3>
-          <p className="mt-1 text-sm text-slate-500">You will be redirected to Moolre to complete payment.</p>
+          <p className="mt-1 text-sm text-slate-500">You will be redirected to Paystack to complete payment.</p>
           {walletNotice ? (
             <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{walletNotice}</p>
           ) : null}

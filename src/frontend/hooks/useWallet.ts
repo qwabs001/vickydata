@@ -80,6 +80,10 @@ export function useWallet() {
         if (!response.ok) {
           return { ok: false, error: data?.error ?? "Unable to add funds." } as const;
         }
+        if (!data?.paymentUrl || new URL(data.paymentUrl).origin !== "https://checkout.paystack.com") {
+          return { ok: false, error: "Unable to open Paystack checkout." } as const;
+        }
+        window.location.assign(data.paymentUrl);
         return { ok: true } as const;
       } catch {
         return { ok: false, error: "Unable to add funds." } as const;
