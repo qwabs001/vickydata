@@ -110,7 +110,7 @@ export default function CustomerDashboardPage() {
       params.get("txn_ref") ||
       params.get("trxref");
 
-    if (urlPayment === "success" && reference) {
+    if ((urlPayment === "success" || urlPayment === "pending") && reference) {
       fetch(
         `/api/payments/verify?ref=${encodeURIComponent(reference)}&userId=${encodeURIComponent(user.id)}`
       )

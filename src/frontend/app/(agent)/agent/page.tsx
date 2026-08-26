@@ -65,7 +65,7 @@ export default function AgentDashboardPage() {
       params.get("transaction_ref") ||
       params.get("txn_ref") ||
       params.get("trxref");
-    if (params.get("payment") === "success" && reference) {
+    if (["success", "pending"].includes(params.get("payment") ?? "") && reference) {
       fetch(
         `/api/payments/verify?ref=${encodeURIComponent(reference)}&userId=${encodeURIComponent(user.id)}`
       )

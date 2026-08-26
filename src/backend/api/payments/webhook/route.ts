@@ -1,5 +1,1 @@
-import { NextResponse } from "next/server";
-
-export async function POST() {
-  return NextResponse.json({ received: true });
-}
+export { POST } from "@/backend/api/webhooks/paystack/route";

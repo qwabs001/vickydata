@@ -284,7 +284,7 @@ limit=10          (optional) Limit results`,
         method: "POST",
         path: "/api/payments/initialize",
         title: "Initialize Payment",
-        description: "Start a Moolre hosted checkout for an order, wallet top-up, or agent upgrade.",
+        description: "Start Paystack checkout for an order, wallet top-up, or agent upgrade. Order prices and upgrade fees are calculated by the server.",
         auth: true,
         requestBody: `{
   "userId": "clx...",
@@ -297,18 +297,18 @@ limit=10          (optional) Limit results`,
   "recipientNumber": "0241234567"
 }`,
         responseBody: `{
-  "paymentUrl": "https://pos.moolre.com/checkout/xxx",
-  "reference": "MOOLRE-xxx"
+  "paymentUrl": "https://checkout.paystack.com/xxx",
+  "reference": "PS-xxx"
 }`
       },
       {
         method: "POST",
         path: "/api/payments/verify",
         title: "Verify Payment",
-        description: "Confirm a completed Moolre payment and process the linked order or wallet top-up.",
+        description: "Verify a Paystack payment and process its saved order, wallet top-up, or agent upgrade.",
         auth: true,
         requestBody: `{
-  "reference": "MOOLRE-xxx"
+  "reference": "PS-xxx"
 }`,
         responseBody: `{
   "status": "completed",
@@ -361,19 +361,16 @@ limit=10          (optional) Limit results`,
         method: "POST",
         path: "/api/wallet/add",
         title: "Add Funds",
-        description: "Add funds to wallet after payment verification.",
+        description: "Open Paystack checkout to fund a wallet. The wallet is credited only after verified payment.",
         auth: true,
         requestBody: `{
   "userId": "clx...",
   "amount": 50.00
 }`,
         responseBody: `{
-  "transaction": {
-    "id": "clx...",
-    "amount": 50.00,
-    "balanceBefore": 0,
-    "balanceAfter": 50.00
-  }
+  "paymentUrl": "https://checkout.paystack.com/xxx",
+  "reference": "PS-xxx",
+  "provider": "PAYSTACK"
 }`
       }
     ]

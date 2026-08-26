@@ -1,1 +1,1 @@
-export { POST } from "@/backend/api/payments/moolre/initialize/route";
+export { POST } from "@/backend/api/payments/paystack/initialize/route";

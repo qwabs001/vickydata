@@ -28,6 +28,26 @@ const bodySchema = z.object({
   moolre: moolreSchema.optional()
 });
 
+export async function POST(request: Request) {
+  const auth = await requireAdmin(request);
+  if (!auth.ok) return auth.response;
+  const parsed = paystackSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid Paystack settings." }, { status: 400 });
+  const { publicKey, secretKey, mode } = parsed.data;
+  const suffix = mode === "Live" ? "live_" : "test_";
+  if (!publicKey.trim().startsWith("pk_" + suffix) || !secretKey.trim().startsWith("sk_" + suffix)) {
+    return NextResponse.json({ error: "Both Paystack keys must match the selected mode." }, { status: 400 });
+  }
+  try {
+    const response = await fetch("https://api.paystack.co/balance", {
+      headers: { Authorization: `Bearer ${secretKey.trim()}` }, signal: AbortSignal.timeout(10000), cache: "no-store"
+    });
+    const result = await response.json();
+    if (!response.ok || !result.status) return NextResponse.json({ error: "Paystack rejected the secret key." }, { status: 400 });
+    return NextResponse.json({ ok: true, message: "Paystack accepted your secret key. Save to apply these settings." });
+  } catch { return NextResponse.json({ error: "Paystack could not be reached. Please retry." }, { status: 503 }); }
+}
+
 export async function GET(request: Request) {
   try {
     const auth = await requireAdmin(request);

@@ -116,14 +116,21 @@ export default function Page() {
     }
   };
 
-  const handlePaystackValidate = () => {
+  const handlePaystackValidate = async () => {
     if (!paystackForm.publicKey || !paystackForm.secretKey) {
       setSaveNotice("Add Paystack keys before validating.");
       window.setTimeout(() => setSaveNotice(null), 3000);
       return;
     }
-    setSaveNotice("Paystack keys look good.");
-    window.setTimeout(() => setSaveNotice(null), 3000);
+    setSaveNotice("Checking with Paystack...");
+    try {
+      const res = await fetch("/api/admin/settings/payment", {
+        method: "POST", headers: { "Content-Type": "application/json", "x-user-id": user?.id ?? "" },
+        body: JSON.stringify(paystackForm)
+      });
+      const data = await res.json();
+      setSaveNotice(data.message ?? data.error ?? "Validation failed.");
+    } catch { setSaveNotice("Unable to reach Paystack. Please retry."); }
   };
 
   const handleMoolreTest = async () => {
@@ -148,7 +155,7 @@ export default function Page() {
     <div className="flex max-w-4xl flex-col gap-6">
       <header>
         <h1 className="text-2xl font-black text-[#0f172a]">Payment Settings</h1>
-        <p className="text-sm text-slate-500">Use Moolre as your primary checkout gateway and keep Paystack only as a legacy fallback.</p>
+        <p className="text-sm text-slate-500">Paystack handles bundle purchases, wallet top-ups and agent upgrades.</p>
       </header>
 
       {saveNotice ? (
@@ -161,10 +168,10 @@ export default function Page() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-[#0f172a]">Paystack</h2>
-            <p className="text-sm text-slate-500">Keep Paystack keys only if you still need legacy webhook or fallback support.</p>
+            <p className="text-sm text-slate-500">Primary checkout gateway. Save matching Test or Live keys and configure the webhook in Paystack.</p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-            Legacy
+            Primary
           </span>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -176,15 +183,12 @@ export default function Page() {
           />
           <input
             className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+            type="password"
+            autoComplete="new-password"
+            aria-label="Paystack Secret Key"
             placeholder="Paystack Secret Key"
             value={paystackForm.secretKey}
             onChange={(event) => setPaystackForm((prev) => ({ ...prev, secretKey: event.target.value }))}
-          />
-          <input
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
-            placeholder="Webhook Secret"
-            value={paystackForm.webhookSecret}
-            onChange={(event) => setPaystackForm((prev) => ({ ...prev, webhookSecret: event.target.value }))}
           />
           <select
             className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
@@ -194,6 +198,12 @@ export default function Page() {
             <option>Test</option>
             <option>Live</option>
           </select>
+        </div>
+        <div className="mt-5">
+          <label className="text-sm font-semibold text-slate-600" htmlFor="paystack-webhook">Paystack Webhook URL</label>
+          <input id="paystack-webhook" readOnly value={`${appUrl.replace(/\/$/, "")}/api/webhooks/paystack`}
+            className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+          <p className="mt-2 text-xs text-slate-500">Paste this URL into Paystack → Settings → API Keys &amp; Webhooks. Your secret key verifies webhook signatures automatically; no separate webhook secret is required.</p>
         </div>
         <div className="mt-6 flex gap-3">
           <button
@@ -220,10 +230,10 @@ export default function Page() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-[#0f172a]">Moolre</h2>
-            <p className="text-sm text-slate-500">Configure Mobile Money payments and hosted checkout.</p>
+            <p className="text-sm text-slate-500">Legacy reconciliation only. New payments use Paystack.</p>
           </div>
           <span className="rounded-full bg-[#ecfdf3] px-3 py-1 text-xs font-semibold text-[#16a34a]">
-            Primary
+            Legacy
           </span>
         </div>
 
@@ -242,6 +252,7 @@ export default function Page() {
           />
           <input
             className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+            type="password"
             placeholder="Moolre Secret Key"
             value={moolreForm.secretKey}
             onChange={(event) => setMoolreForm((prev) => ({ ...prev, secretKey: event.target.value }))}

@@ -12,6 +12,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:reseller": "tsx --test tests/reseller/**/*.test.ts",
+    "test:payments": "tsx --test tests/payments/*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma db push",
     "prisma:migrate:supabase": "./run-migrations.sh",

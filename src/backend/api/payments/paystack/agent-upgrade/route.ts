@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createMoolreCheckout } from "@/backend/services/payments/moolreCheckoutService";
+import { createPaystackCheckout } from "@/backend/services/payments/paystackCheckoutService";
 
 const bodySchema = z.object({
   userId: z.string().min(1),
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await createMoolreCheckout({
+    const result = await createPaystackCheckout({
       request,
       userId: parsed.data.userId,
       amount: AGENT_UPGRADE_FEE,

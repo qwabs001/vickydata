@@ -61,9 +61,9 @@ export default function BuyDataPage() {
 
   const rewardEligible = rewardsBalance.currentBalance >= 50;
   const rewardToApply = useMemo(() => {
-    if (!selectedPlan || !applyRewards || !rewardEligible) return 0;
+    if (!useWalletBalance || !selectedPlan || !applyRewards || !rewardEligible) return 0;
     return Math.min(rewardsBalance.currentBalance, selectedPlan.price);
-  }, [applyRewards, rewardEligible, rewardsBalance.currentBalance, selectedPlan]);
+  }, [useWalletBalance, applyRewards, rewardEligible, rewardsBalance.currentBalance, selectedPlan]);
 
   const payableAmount = useMemo(() => {
     if (!selectedPlan) return 0;
@@ -487,10 +487,10 @@ export default function BuyDataPage() {
                 <input
                   type="checkbox"
                   checked={applyRewards}
-                  disabled={!rewardEligible}
+                  disabled={!rewardEligible || !useWalletBalance}
                   onChange={(event) => setApplyRewards(event.target.checked)}
                 />
-                Use Rewards (min GHS 50)
+                Use Rewards with wallet (min GHS 50)
               </label>
               <p className="text-[11px] text-white/70">
                 Rewards: {formatCurrency(rewardsBalance.currentBalance, "GHS")} • Applied: {formatCurrency(rewardToApply, "GHS")}
@@ -524,7 +524,7 @@ export default function BuyDataPage() {
       <Dialog open={showWalletModal} onClose={() => setShowWalletModal(false)} mobileBottomSheet>
         <div className="p-6">
           <h3 className="text-lg font-semibold text-slate-900">Add Wallet Funds</h3>
-          <p className="mt-1 text-sm text-slate-500">You will be redirected to Moolre to complete payment.</p>
+          <p className="mt-1 text-sm text-slate-500">You will be redirected to Paystack to complete payment.</p>
           {walletNotice ? (
             <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{walletNotice}</p>
           ) : null}
